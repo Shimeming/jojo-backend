@@ -1,0 +1,27 @@
+services:
+  # web:
+  #   build: .
+  #   ports:
+  #     - "80:8000"
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #   command: ["python", "app.py"]
+ 
+  db:
+    container_name: db-fianl-pg
+    image: postgres:latest
+    restart: always
+    ports:
+      - "23013:5432"
+    environment:
+      POSTGRES_PASSWORD: dbfinal
+      POSTGRES_USER: postgres
+      POSTGRES_DB: test
+    volumes:
+      - ./db/data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
