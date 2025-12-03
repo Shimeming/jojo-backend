@@ -10,7 +10,7 @@ services:
  
   db:
     container_name: db-fianl-pg
-    image: postgres:latest
+    image: postgres:18.1
     restart: always
     ports:
       - "23013:5432"

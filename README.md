@@ -1,11 +1,21 @@
 - use [nvm](https://github.com/nvm-sh/nvm) to set the node version to 24.11.1
-- use `pnpm ci` to install dependencies
+  ```
+  nvm install 24.11.1
+  nvm use 24.11.1
+  ```
+- install tools:
+  ```
+  npm install -g pnpm
+  npm install -g nodemon
+  ```
+- use `pnpm i` to install dependencies
 Use
 ```
 docker compose up
 ```
 to start the db server.
-The db server will be running on port 3010
+The db server will be running on port 23013, and the backend will be running on port 3010.
+The password of the db server is `dbfinal`.
 and store its data in the `db/data/` folder.
 
 Use
