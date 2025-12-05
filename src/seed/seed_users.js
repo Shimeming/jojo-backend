@@ -72,16 +72,16 @@ function random_chinese_name() {
 
   const lastName = random(
     ("李王張劉陳楊黃趙周吳徐孫朱馬胡郭林何高" +
-    "梁鄭羅宋謝唐韓曹許鄧蕭馮曾程蔡彭潘袁於" +
-    "董餘蘇葉呂魏蔣田杜丁沈姜範江傅鐘盧汪戴崔" +
-    "任陸廖姚方金邱夏譚韋賈鄒石熊孟秦閻薛侯雷" +
-    "白龍段郝孔邵史毛常萬顧賴武康賀嚴尹錢施牛洪龔").split("")
+      "梁鄭羅宋謝唐韓曹許鄧蕭馮曾程蔡彭潘袁於" +
+      "董餘蘇葉呂魏蔣田杜丁沈姜範江傅鐘盧汪戴崔" +
+      "任陸廖姚方金邱夏譚韋賈鄒石熊孟秦閻薛侯雷" +
+      "白龍段郝孔邵史毛常萬顧賴武康賀嚴尹錢施牛洪龔").split("")
   )
   const firstName = random(
     ("世中仁伶佩佳俊信倫偉傑儀元冠凱君哲" +
-    "國冠宏志忠思怡怡慧慶文昌明智星昊昕晨柏榮欣正" +
-    "民永玉玲珊珍琪瑜瑞真祥秀秋穎立維美翔翰聖育良" +
-    "芬芳英菁華裕豪貞賢郁鈴銘雅雯霖青靜韻鴻麗龍").split(""),
+      "國冠宏志忠思怡怡慧慶文昌明智星昊昕晨柏榮欣正" +
+      "民永玉玲珊珍琪瑜瑞真祥秀秋穎立維美翔翰聖育良" +
+      "芬芳英菁華裕豪貞賢郁鈴銘雅雯霖青靜韻鴻麗龍").split(""),
     Math.ceil(Math.random() * 2)
   );
   return lastName + firstName;
@@ -146,78 +146,45 @@ function mapYearLevelToRegisterTime(yearLevel, schoolYear) {
   return admissionDate;
 }
 
-
 function buildUsers(n) {
   const users = [];
   const uniqEmails = new Set();
-  const uniqStudentIDs = new Set();
-  // Track per combo index used to derive unique serial numbers
-  const indexCounters = {}; // key: `${DeptCode}_${yearLevel}_${sex}` -> next index
+  const indexCounters = {}; // Key: "DeptCode_YearLevel_Sex", Value: current index
 
-  // Build sampling combos with weights from department counts
-  const departments = ntuDepartments;
-  const combos = [];
-  for (const dept of departments) {
+  for (const dept of ntuDepartments) {
+    // Iterate over year levels 1 through 7, and the Extended level (8)
     for (let yearLevel = 1; yearLevel <= 8; yearLevel++) {
       const yearKey = yearLevel <= 7 ? `Y${yearLevel}` : 'Ext';
-      const maleCount = dept[`${yearKey}M`] || 0;
-      const femaleCount = dept[`${yearKey}F`] || 0;
-      if (maleCount > 0) combos.push({ deptCode: dept.DeptCode, yearLevel, sex: 'Male', max: maleCount });
-      if (femaleCount > 0) combos.push({ deptCode: dept.DeptCode, yearLevel, sex: 'Female', max: femaleCount });
+
+      const maxMale = dept[`${yearKey}M`] || 0;
+      const maxFemale = dept[`${yearKey}F`] || 0;
+
+      if (maxMale === 0 && maxFemale === 0) continue;
+
+      const baseCounterKey = `${dept.DeptCode}_${yearLevel}`;
+
+      for (let i = 0; i < maxMale + maxFemale; i++) {
+        const sex = (i < maxMale) ? 'Male' : 'Female';
+        const studentID = ntuStudentId(dept.DeptCode, yearLevel, i);
+        const email = ntuEmailFromID(studentID);
+        if (uniqEmails.has(email)) continue;
+        uniqEmails.add(email);
+        const registerTime = mapYearLevelToRegisterTime(yearLevel, CURRENT_SCHOOL_YEAR);
+
+        users.push({
+          name: random_chinese_name(),
+          email: email,
+          sex: sex,
+          password_hash: randomPasswordHash(),
+          phone: twMobile(),
+          register_time: registerTime,
+        });
+      }
     }
   }
-
-  const weights = combos.map((c) => c.max);
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  const cumulative = [];
-  let acc = 0;
-  for (const w of weights) { acc += w; cumulative.push(acc); }
-
-  function sampleCombo() {
-    const r = faker.number.int({ min: 1, max: totalWeight });
-    let idx = cumulative.findIndex((c) => r <= c);
-    if (idx < 0) idx = combos.length - 1;
-    return combos[idx];
-  }
-  // Generate exactly n users via sampling, respecting per-combo max by index counters
-  let attempts = 0;
-  const maxAttempts = n * 20; // safety cap
-  while (users.length < n && attempts < maxAttempts) {
-    attempts++;
-    const { deptCode, yearLevel, sex, max } = sampleCombo();
-    const key = `${deptCode}_${yearLevel}_${sex}`;
-    const currentIndex = indexCounters[key] || 0;
-    if (currentIndex >= max) {
-      continue;
-    }
-
-    const studentID = ntuStudentId(deptCode, yearLevel, currentIndex);
-    if (uniqStudentIDs.has(studentID)) {
-      indexCounters[key] = currentIndex + 1;
-      continue;
-    }
-    const email = ntuEmailFromID(studentID);
-    if (uniqEmails.has(email)) {
-      indexCounters[key] = currentIndex + 1;
-      continue;
-    }
-
-    indexCounters[key] = currentIndex + 1;
-    uniqStudentIDs.add(studentID);
-    uniqEmails.add(email);
-
-    const registerTime = mapYearLevelToRegisterTime(yearLevel, CURRENT_SCHOOL_YEAR);
-    users.push({
-      name: random_chinese_name(),
-      email,
-      sex,
-      password_hash: randomPasswordHash(),
-      phone: twMobile(),
-      register_time: registerTime,
-    });
-  }
-
-  return users;
+  // Truncate the users array to match the total count from the data, which is the implicit COUNT.
+  // The loop logic ensures we don't over-generate, so this is just a final check.
+  return faker.helpers.shuffle(users).slice(0, n);
 }
 
 async function insertUsers(users) {
