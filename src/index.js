@@ -1,21 +1,10 @@
 import express from 'express';
-import pgPromise from 'pg-promise';
-import dotenv from 'dotenv';
+import { db } from './lib/db.js';
+import { loadEnv } from './lib/env.js';
 
-if (process.env.NODE_ENV !== 'production') {
-  dotenv.config({ path: ['.env', '.env.example'], quiet: true });
-}
+loadEnv();
 
-const PORT = process.env.PORT;
-
-const pgp = pgPromise({});
-const db = pgp({
-  host: process.env.POSTGRES_HOST,
-  port: Number(process.env.POSTGRES_PORT),
-  database: process.env.POSTGRES_DB_NAME,
-  user: process.env.POSTGRES_USER,
-  password: process.env.POSTGRES_PASSWORD,
-});
+const PORT = process.env.PORT || 3000;
 
 const app = express();
 
