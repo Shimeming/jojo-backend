@@ -15,8 +15,8 @@ Use
 ```
 docker compose up
 ```
-to start the db server.
-The db server will be running on port 23013, and the backend will be running on port 3010.
+to start the db servers (PostgreSQL and MongoDB).
+The PostgreSQL server will be running on port 23013, and the backend will be running on port 3010.
 The password of the db server is `dbfinal`.
 and store its data in the `db/data/` folder.
 
@@ -34,7 +34,9 @@ SELECT * FROM test_table;
 ```
 to create a test table, insert a row, and query the row.
 
-Then go to `localhost:3000/test` to see if the backend server can connect to the db server successfully.
+Then go to `localhost:3010/test` to see if the backend server can connect to the PostgreSQL server successfully.
+
+To test the MongoDB functionality, go to `localhost:3010/test-mongo` to see if the backend server can connect to the MongoDB server successfully. This will insert a document into a test collection, retrieve it, and then delete it.
 
 ## Data
 ### User
