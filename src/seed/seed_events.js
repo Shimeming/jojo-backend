@@ -71,16 +71,16 @@ function randomStatus(start, end) {
 
 async function getExistingIds() {
     // Fetch candidate IDs for FKs
-    const users = await db.manyOrNone('SELECT "User_id" as id FROM public."USER" LIMIT 1000');
-    const groups = await db.manyOrNone('SELECT "Group_id" as id FROM public."GROUP" LIMIT 1000');
-    const types = await db.manyOrNone('SELECT name FROM public."TYPE"');
-    
+    const users = await db.manyOrNone('SELECT user_id as id FROM jojo.user LIMIT 1000');
+    const groups = await db.manyOrNone('SELECT group_id as id FROM jojo.group LIMIT 1000');
+    const types = await db.manyOrNone('SELECT name FROM jojo.type');
+
     return {
         userIds: users.map((u) => u.id),
         groupIds: groups.map((g) => g.id),
         typeNames: types.length ? types.map((t) => t.name) : ACTIVITY_TYPES,
         // In a real app, VENUE IDs would be fetched from DB, but we use DUMMY_VENUES here
-        venueIds: DUMMY_VENUES.map(v => v.Venue_id) 
+        venueIds: DUMMY_VENUES.map(v => v.Venue_id)
     };
 }
 
@@ -91,11 +91,11 @@ function buildOneEvent(eventId, ids, windowDays = 21) {
     const ownerId = pick(ids.userIds);
     const typeName = ids.typeNames && ids.typeNames.length ? pick(ids.typeNames) : pick(ACTIVITY_TYPES);
     const type = typeName;
-    
+
     // --- Time Generation ---
     const needBook = randomNeedBook(type);
     const today = new Date();
-    
+
     // Determine the Start Time (20% past, 80% future)
     let start;
     if (faker.datatype.boolean(0.2)) {
@@ -103,7 +103,7 @@ function buildOneEvent(eventId, ids, windowDays = 21) {
     } else {
         start = faker.date.soon({ days: windowDays, refDate: today }); // Future event
     }
-    
+
     // Enforce 1-3 hour duration
     const durationHours = faker.number.int({ min: 1, max: 3 });
     const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000);
@@ -113,19 +113,19 @@ function buildOneEvent(eventId, ids, windowDays = 21) {
     let location_desc;
     let venue_booking_record = null;
     let capacity = randomCapacity(type);
-    
+
     if (needBook) {
         // Choose a venue and enforce constraints
         const venue = pick(DUMMY_VENUES);
         const venueId = venue.Venue_id;
         location_desc = venue.Name;
-        
+
         // Ensure event time is within venue open/close times
         start.setHours(faker.number.int({ min: venue.Open_time, max: venue.Close_time - durationHours }));
         end.setTime(start.getTime() + durationHours * 60 * 60 * 1000);
-        
+
         capacity = faker.number.int({ min: 2, max: venue.Capacity });
-        
+
         venue_booking_record = {
             event_id: eventId,
             venue_id: venueId,
@@ -135,7 +135,7 @@ function buildOneEvent(eventId, ids, windowDays = 21) {
         const places = ['溫州街', '師大夜市', '公館捷運站', '醉月湖旁', '女九下', '活動中心前'];
         location_desc = pick(places);
     }
-    
+
     // --- Group Restriction Logic ---
     const isGroupRestricted = faker.datatype.boolean(0.4);
     const restriction_records = [];
@@ -169,7 +169,7 @@ function buildOneEvent(eventId, ids, windowDays = 21) {
             to: start,
         }),
     };
-    
+
     return {
         event: event_record,
         venue_booking: venue_booking_record,
@@ -181,20 +181,20 @@ function buildAllRecords(n, ids) {
     const events = [];
     const venueBookings = [];
     const groupRestrictions = [];
-    
+
     // Start Event_id counter from 1 (assuming the table is empty or we manage the serial ourselves)
     for (let i = 1; i <= n; i++) {
         const records = buildOneEvent(i, ids);
-        
+
         events.push(records.event);
-        
+
         if (records.venue_booking) {
             venueBookings.push(records.venue_booking);
         }
-        
+
         groupRestrictions.push(...records.restrictions);
     }
-    
+
     return { events, venueBookings, groupRestrictions };
 }
 
@@ -205,10 +205,10 @@ async function insertEvents(events) {
     const cs = new pgp.helpers.ColumnSet(
         [
             // Note: Removed 'group_id'
-            'event_id', 'owner_id', 'type_name', 'need_book', 'title', 'content', 
+            'event_id', 'owner_id', 'type_name', 'need_book', 'title', 'content',
             'capacity', 'location_desc', 'start_time', 'end_time', 'status', 'created_at'
         ],
-        { table: { table: 'EVENT', schema: 'public' } }
+        { table: { table: 'event', schema: 'jojo' } }
     );
     const query = pgp.helpers.insert(events, cs) + ' ON CONFLICT (event_id) DO NOTHING';
     return db.none(query);
@@ -217,7 +217,7 @@ async function insertEvents(events) {
 async function insertVenueBookings(bookings) {
     const cs = new pgp.helpers.ColumnSet(
         ['event_id', 'venue_id'],
-        { table: { table: 'VENUE_BOOKING', schema: 'public' } }
+        { table: { table: 'venue_booking', schema: 'jojo' } }
     );
     const query = pgp.helpers.insert(bookings, cs);
     return db.none(query);
@@ -226,7 +226,7 @@ async function insertVenueBookings(bookings) {
 async function insertGroupRestrictions(restrictions) {
     const cs = new pgp.helpers.ColumnSet(
         ['event_id', 'group_id'],
-        { table: { table: 'EVENT_GROUP_RESTRICTION', schema: 'public' } }
+        { table: { table: 'event_group_restriction', schema: 'jojo' } }
     );
     const query = pgp.helpers.insert(restrictions, cs);
     return db.none(query);
@@ -240,14 +240,14 @@ async function main() {
         console.error('No users found. Seed users before seeding events.');
         process.exit(1);
     }
-    
+
     const { events, venueBookings, groupRestrictions } = buildAllRecords(COUNT, ids);
 
     if (DRY_RUN && !INSERT) {
         console.log(`[dry] Generated ${events.length} EVENT records.`);
         console.log(`[dry] Generated ${venueBookings.length} VENUE_BOOKING records.`);
         console.log(`[dry] Generated ${groupRestrictions.length} EVENT_GROUP_RESTRICTION records.`);
-        
+
         console.log('\n--- Sample EVENT Records ---');
         console.table(events.slice(0, Math.min(10, events.length)).map((e) => ({
             ID: e.event_id,
@@ -260,25 +260,25 @@ async function main() {
             Status: e.status,
             Restrictions: groupRestrictions.filter(r => r.event_id === e.event_id).map(r => r.group_id).join(', ')
         })));
-        
+
     }
-    
+
     if (INSERT) {
         try {
             // Note: Order of insertion matters (EVENT must be first)
             await insertEvents(events);
             console.log(`Inserted ${events.length} EVENT records.`);
-            
+
             if (venueBookings.length) {
                 await insertVenueBookings(venueBookings);
                 console.log(`Inserted ${venueBookings.length} VENUE_BOOKING records.`);
             }
-            
+
             if (groupRestrictions.length) {
                 await insertGroupRestrictions(groupRestrictions);
                 console.log(`Inserted ${groupRestrictions.length} EVENT_GROUP_RESTRICTION records.`);
             }
-            
+
         } catch (err) {
             console.error('Failed to insert records:', err);
             process.exitCode = 1;

@@ -55,7 +55,7 @@ const ntuDepartments = parseDepartmentsCSV(CSV_PATH);
 
 const args = process.argv.slice(2);
 
-const COUNT = args.includes('--count') ? Number(args[args.indexOf('--count') + 1]) : 100;
+const COUNT = args.includes('--count') ? Number(args[args.indexOf('--count') + 1]) : 10000;
 const DRY_RUN = args.includes('--dry');
 const CURRENT_SCHOOL_YEAR = 113; // 113學年度 (Data captured 114/03/25, which is 113-2 semester)
 
@@ -149,7 +149,7 @@ function mapYearLevelToRegisterTime(yearLevel, schoolYear) {
 function buildUsers(n) {
   const users = [];
   const uniqEmails = new Set();
-  const indexCounters = {}; // Key: "DeptCode_YearLevel_Sex", Value: current index
+  const uniqPhones = new Set();
 
   for (const dept of ntuDepartments) {
     // Iterate over year levels 1 through 7, and the Extended level (8)
@@ -169,6 +169,13 @@ function buildUsers(n) {
         const email = ntuEmailFromID(studentID);
         if (uniqEmails.has(email)) continue;
         uniqEmails.add(email);
+
+        // Ensure phone uniqueness
+        let phoneVal = twMobile();
+        while (uniqPhones.has(phoneVal)) {
+          phoneVal = twMobile();
+        }
+        uniqPhones.add(phoneVal);
         const registerTime = mapYearLevelToRegisterTime(yearLevel, CURRENT_SCHOOL_YEAR);
 
         users.push({
@@ -176,7 +183,7 @@ function buildUsers(n) {
           email: email,
           sex: sex,
           password_hash: randomPasswordHash(),
-          phone: twMobile(),
+          phone: phoneVal,
           register_time: registerTime,
         });
       }
@@ -197,7 +204,7 @@ async function insertUsers(users) {
       { name: 'phone' },
       { name: 'register_time' },
     ],
-    { table: { table: 'USER', schema: 'public' } }
+    { table: { table: 'user', schema: 'jojo' } }
   );
   const query = pgp.helpers.insert(users, cs);
   return db.none(query);
@@ -222,7 +229,7 @@ async function main() {
   }
   try {
     await insertUsers(users);
-    console.log(`Inserted ${users.length} users into public."USER"`);
+    console.log(`Inserted ${users.length} users into jojo.user`);
   } catch (err) {
     console.error('Failed to insert users:', err);
     process.exitCode = 1;

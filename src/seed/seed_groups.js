@@ -110,7 +110,7 @@ const CLUBS = [
 async function insertGroups(groups) {
   const cs = new pgp.helpers.ColumnSet(
     ['name'],
-    { table: { table: 'GROUP', schema: 'public' } }
+    { table: { table: 'group', schema: 'jojo' } }
   );
   const query = pgp.helpers.insert(groups, cs);
   return db.none(query);
@@ -128,7 +128,7 @@ async function main() {
   if (INSERT) {
     try {
       await insertGroups(groups);
-      console.log(`Inserted ${groups.length} GROUP rows into public."GROUP"`);
+      console.log(`Inserted ${groups.length} GROUP rows into jojo.group`);
     } catch (err) {
       console.error('Failed to insert groups:', err);
       process.exitCode = 1;

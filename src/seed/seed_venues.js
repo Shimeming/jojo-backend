@@ -75,7 +75,7 @@ function enumerateVenues() {
 async function insertVenues(venues) {
   const cs = new pgp.helpers.ColumnSet(
     ['name', 'building', 'location'],
-    { table: { table: 'VENUE', schema: 'public' } }
+    { table: { table: 'venue', schema: 'jojo' } }
   );
   const query = pgp.helpers.insert(venues, cs);
   return db.none(query);
@@ -97,7 +97,7 @@ async function main() {
   if (INSERT) {
     try {
       await insertVenues(venues);
-      console.log(`Inserted ${venues.length} VENUE records into public."VENUE"`);
+      console.log(`Inserted ${venues.length} VENUE records into jojo.venue`);
     } catch (err) {
       console.error('Failed to insert venues:', err);
       process.exitCode = 1;
