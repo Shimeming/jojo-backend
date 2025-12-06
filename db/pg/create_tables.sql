@@ -69,12 +69,7 @@ CREATE TABLE IF NOT EXISTS "VENUE" (
   "venue_id" BIGSERIAL PRIMARY KEY,
   "name" VARCHAR(100) NOT NULL,
   "building" VARCHAR(100),
-  "floor" INTEGER,
-  "capacity" INTEGER,
-  "open_time" TIME,
-  "close_time" TIME,
-  "status" ENUM('available', 'unavailable') DEFAULT 'available',
-  CONSTRAINT capacity_check CHECK ("capacity" IS NULL OR "capacity" > 0)
+  "location" VARCHAR(100),
 );
 -- VENUE_BOOKING
 CREATE TABLE IF NOT EXISTS "VENUE_BOOKING" (
