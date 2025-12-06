@@ -40,4 +40,7 @@ Then go to `localhost:3000/test` to see if the backend server can connect to the
 ### User
 - number of people in departments:
   https://www.aca.ntu.edu.tw/WebUPD/aca/UAADStatistics/113%E4%B8%8B%E5%AD%B8%E6%9C%9F%E5%AD%B8%E7%94%9F%E4%BA%BA%E6%95%B8%E7%B5%B1%E8%A8%88%E8%A1%A8.pdf
+- Events
+  - meet up: https://www.kaggle.com/datasets/megelon/meetup
+  - event attendance: https://www.kaggle.com/datasets/cankatsrc/event-attendance-dataset
 
