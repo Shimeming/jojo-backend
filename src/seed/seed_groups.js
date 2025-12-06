@@ -108,7 +108,7 @@ const CLUBS = [
 
 async function insertGroups(groups) {
   const cs = new pgp.helpers.ColumnSet(
-    ['name'],
+    ['name', 'category'],
     { table: { table: 'group', schema: 'jojo' } }
   );
   const query = pgp.helpers.insert(groups, cs);
@@ -116,9 +116,10 @@ async function insertGroups(groups) {
 }
 
 async function main() {
-  const departmentGroups = DEPARTMENTS.map((d) => `臺大${d}`);
-  const groups = [...departmentGroups, ...DORMS, ...CLUBS]
-    .map((name) => ({ name }));
+  const departmentGroups = DEPARTMENTS.map((d) => ({ name: `臺大${d}`, category: 'department' }));
+  const dormGroups = DORMS.map((name) => ({ name, category: 'dorm' }));
+  const clubGroups = CLUBS.map((name) => ({ name, category: 'club' }));
+  const groups = [...departmentGroups, ...dormGroups, ...clubGroups];
   if (DRY_RUN) {
     console.log(`[dry] Generated ${groups.length} GROUP rows:`);
     console.table(groups);

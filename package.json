@@ -13,7 +13,7 @@
     "seed:groups": "node src/seed/seed_groups.js",
     "seed:user_groups": "node src/seed/seed_user_groups.js",
     "seed:venues": "node src/seed/seed_venues.js",
-    "seed": "pnpm run seed:users && pnpm run seed:groups && pnpm run seed:user_groups && pnpm run seed:venues"
+    "seed": "pnpm run seed:users && pnpm run seed:groups && pnpm run seed:user_groups"
   },
   "keywords": [],
   "author": "",

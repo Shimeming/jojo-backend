@@ -1,14 +1,9 @@
 CREATE SCHEMA IF NOT EXISTS jojo;
 -- Enum types
-DO $$ BEGIN
-  CREATE TYPE sex_enum AS ENUM ('Male', 'Female', 'Other');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  CREATE TYPE event_status_enum AS ENUM ('Open', 'Closed', 'Cancelled');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-DO $$ BEGIN
-  CREATE TYPE join_status_enum AS ENUM ('confirmed', 'pending', 'rejected', 'cancelled');
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+CREATE TYPE sex_enum AS ENUM ('Male', 'Female', 'Other');
+CREATE TYPE event_status_enum AS ENUM ('Open', 'Closed', 'Cancelled');
+CREATE TYPE join_status_enum AS ENUM ('confirmed', 'pending', 'rejected', 'cancelled');
+CREATE TYPE group_category_enum AS ENUM ('department','dorm','club');
 
 CREATE TABLE IF NOT EXISTS jojo.USER (
   user_id BIGSERIAL PRIMARY KEY,
@@ -31,7 +26,8 @@ CREATE TABLE IF NOT EXISTS jojo.ADMIN_USER (
 -- GROUP
 CREATE TABLE IF NOT EXISTS jojo.GROUP (
   group_id BIGSERIAL PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE
+  name VARCHAR(100) NOT NULL UNIQUE,
+  category group_category_enum NOT NULL
 );
 -- USER_GROUP
 CREATE TABLE IF NOT EXISTS jojo.USER_GROUP (
