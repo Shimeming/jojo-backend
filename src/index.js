@@ -125,13 +125,26 @@ app.get('/api/venues', async (req, res) => {
 // --- D. 建立新活動 (POST) ---
 app.post('/api/events', async (req, res) => {
     // 從 req.body 拿資料 (這就是為什麼要有 express.json())
-    const { title, typeId, content, capacity, date } = req.body;
+    const { title, typeId, content, capacity, date, Group_id, groupId } = req.body;
+    const finalGroupId = Group_id || groupId || null;
     try {
         // 這裡 Owner_id 先寫死為 1 (趙仲文 Demo)
         const result = await db.one(
-            `INSERT INTO "EVENT" ("Owner_id", "Type_name", "Title", "Content", "Capacity", "Start_time", "End_time") 
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING "Event_id"`,
-            [1, typeId || '其他', title, content, capacity, `${date} 10:00:00`, `${date} 12:00:00`]
+            `INSERT INTO "EVENT" 
+                ("Owner_id", "Type_name", "Title", "Content", "Capacity", "Start_time", "End_time", "Group_id") 
+             VALUES 
+                ($1, $2, $3, $4, $5, $6, $7, $8) 
+             RETURNING "Event_id"`,
+             [
+                1,                        // $1
+                typeId || '其他',          // $2
+                title,                    // $3
+                content,                  // $4
+                capacity,                 // $5
+                `${date} 10:00:00`,       // $6
+                `${date} 12:00:00`,       // $7
+                finalGroupId              // 
+            ]
         );
         res.json({ success: true, eventId: result.Event_id });
     } catch (err) {
