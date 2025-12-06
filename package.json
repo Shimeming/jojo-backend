@@ -8,7 +8,12 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node dist/index.js",
     "dev": "nodemon src/index.js",
-    "seed:users": "node src/seed/seed_users.js"
+    "seed:events": "node src/seed/seed_events.js",
+    "seed:users": "node src/seed/seed_users.js",
+    "seed:groups": "node src/seed/seed_groups.js",
+    "seed:user_groups": "node src/seed/seed_user_groups.js",
+    "seed:venues": "node src/seed/seed_venues.js",
+    "seed": "pnpm run seed:users && pnpm run seed:groups && pnpm run seed:user_groups && pnpm run seed:venues"
   },
   "keywords": [],
   "author": "",

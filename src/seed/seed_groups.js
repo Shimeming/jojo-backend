@@ -57,10 +57,10 @@ const DORMS = [
     `男${['一', '二', '三', '四', '五', '六', '七', '八'][i - 1]}舍`
   ),
   '大一女舍',
-  ...range(10).map((i) =>
+  ...range(8).map((i) =>
     `女${['一', '二', '三', '四', '五', '六', '八', '九'][i - 1]}舍`
   ),
-  ...range(6).map((i) => `研${['一', '三'][i - 1]}舍`),
+  ...range(2).map((i) => `研${['一', '三'][i - 1]}舍`),
   '長興BOT A 棟', '長興BOT B 棟', '水源BOT A 棟',
   '水源BOT B 棟', '水源BOT C 棟'
 ];
@@ -120,12 +120,11 @@ async function main() {
   const departmentGroups = DEPARTMENTS.map((d) => `臺大${d}`);
   const groups = [...departmentGroups, ...DORMS, ...CLUBS]
     .map((name) => ({ name }));
-  if (DRY_RUN && !INSERT) {
+  if (DRY_RUN) {
     console.log(`[dry] Generated ${groups.length} GROUP rows:`);
     console.table(groups);
     return;
-  }
-  if (INSERT) {
+  } else {
     try {
       await insertGroups(groups);
       console.log(`Inserted ${groups.length} GROUP rows into jojo.group`);
@@ -135,8 +134,6 @@ async function main() {
     } finally {
       pgp.end();
     }
-  } else {
-    pgp.end();
   }
 }
 
