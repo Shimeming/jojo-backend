@@ -12,7 +12,6 @@ loadEnv();
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry');
-const INSERT = args.includes('--insert');
 
 async function getAllUsers() {
   const users = await db.any('SELECT user_id FROM jojo.user ORDER BY user_id');
@@ -31,14 +30,14 @@ function makeUserGroups(userIds, groupIds) {
     const count = faker.number.int({ min: 0, max: 3 });
     const selected = faker.helpers.arrayElements(groupIds, count);
     for (const gid of selected) {
-      rows.push({ User_id: uid, Group_id: gid });
+      rows.push({ user_id: uid, group_id: gid });
     }
   }
   return rows;
 }
 
 async function insertUserGroups(rows) {
-  const cs = new pgp.helpers.ColumnSet(['User_id', 'Group_id'], {
+  const cs = new pgp.helpers.ColumnSet(['user_id', 'group_id'], {
     table: { table: 'user_group', schema: 'jojo' },
   });
   const query = pgp.helpers.insert(rows, cs);
@@ -61,14 +60,12 @@ async function main() {
 
     const rows = makeUserGroups(userIds, groupIds);
 
-    if (DRY_RUN && !INSERT) {
+    if (DRY_RUN) {
       console.log(`[dry] Generated ${rows.length} USER_GROUP rows`);
       console.table(rows.slice(0, 20));
       console.log('...');
       return;
-    }
-
-    if (INSERT) {
+    } else {
       await insertUserGroups(rows);
       console.log(`Inserted ${rows.length} USER_GROUP rows into jojo.user_group`);
     }

@@ -12,7 +12,6 @@ loadEnv();
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry');
-const INSERT = args.includes('--insert');
 
 // Load all departments from department_people.csv
 function parseDepartmentsCSV(csvPath) {
