@@ -22,7 +22,7 @@ export default defineConfig([
   {
     rules: {
       'max-len': ['warn', {
-        code: 99,
+        code: 80,
         tabWidth: 2,
         comments: 99,
         ignoreComments: false,
