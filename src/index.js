@@ -626,6 +626,58 @@ app.get('/api/admin/analytics/top-hosts', async (req, res) => {
     }
 });
 
+// --- G. 取得所有標準興趣標籤 (GET) ---
+app.get('/api/preferences/list', (req, res) => {
+    // 假設這是推薦系統預設的標準標籤清單
+    const standardTags = [
+        "運動", "讀書", "電影", "宵夜", "戶外", "桌遊", "Coding", "攝影", "音樂", "美食"
+    ];
+    res.json(standardTags);
+});
+// --- H. 新增使用者偏好標籤 (POST) ---
+app.post('/api/users/:id/preferences', async (req, res) => {
+    const userId = req.params.id;
+    const { typeName } = req.body; // typeName 就是使用者選擇的標籤 (例如 "Coding")
+    // 新增一個預設的 Priority 值
+    const defaultPriority = 1;
+    try {
+        await db.none(
+            //  修正 SQL 語法：在欄位清單中加入 "Priority"
+            `INSERT INTO "PREFERENCE" ("User_id", "Type_name", "Priority") 
+             VALUES ($1, $2, $3) ON CONFLICT ("User_id", "Type_name") DO NOTHING`, // $3 是 Priority
+            
+            //  修正參數陣列：加入第三個參數 (Priority)
+            [userId, typeName, defaultPriority]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Add Preference Error:', err);
+        res.status(500).json({ error: 'Failed to add preference' });
+    }
+});
+// --- I. 移除使用者偏好標籤 (DELETE) ---
+app.delete('/api/users/:userId/preferences/:typeName', async (req, res) => {
+    const { userId, typeName } = req.params; // 從 URL 參數獲取 User ID 和 Type Name
+
+    try {
+        // SQL 邏輯：從 PREFERENCE 表中刪除該使用者的該標籤
+        const result = await db.result(
+            `DELETE FROM "PREFERENCE" WHERE "User_id" = $1 AND "Type_name" = $2`,
+            [userId, typeName]
+        );
+
+        // 檢查是否有刪除任何行
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'Preference not found or already deleted.' });
+        }
+        
+        res.json({ success: true, message: 'Preference deleted.' });
+
+    } catch (err) {
+        console.error('Delete Preference Error:', err);
+        res.status(500).json({ error: 'Failed to delete preference.' });
+    }
+});
 
 app.get('/', (_req, res) => {
   res.send('JoJo Backend is Running!');
