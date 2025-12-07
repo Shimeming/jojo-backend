@@ -1,6 +1,5 @@
 import { db, pgp } from '../lib/db.js';
 import { loadEnv } from '../lib/env.js';
-import { faker } from '@faker-js/faker';
 import fs from 'fs';
 import path from 'path';
 

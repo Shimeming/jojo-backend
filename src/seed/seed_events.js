@@ -8,14 +8,13 @@ import { parse } from "csv-parse/sync";
 loadEnv();
 
 // Seed script for EVENT table using meetup data
-// Schema: jojo.EVENT(event_id, owner_id, group_id, type_name, need_book, title, content, capacity, location_desc, start_time, end_time, status, created_at)
+// Schema: jojo.EVENT(event_id, owner_id, group_id, type_name, title, content, capacity, location_desc, venue_id, start_time, end_time, status, created_at)
 
 const args = process.argv.slice(2);
 const COUNT = args.includes("--count")
   ? Number(args[args.indexOf("--count") + 1])
   : 10000;
 const DRY_RUN = args.includes("--dry");
-const INSERT = args.includes("--insert");
 
 // prettier-ignore
 // Event types from seed_event_types.csv
@@ -222,64 +221,66 @@ function generateContent(meetupDescription, eventType) {
 function adjustToRecentYear(date) {
   const d = new Date(date);
   const currentYear = new Date().getFullYear();
-  const useLastYear = faker.datatype.boolean({ probability: 0.4 });
-  d.setFullYear(useLastYear ? currentYear - 1 : currentYear);
-  if (d > new Date()) {
-    d.setFullYear(d.getFullYear() - 1);
-  }
+  d.setFullYear(
+    faker.helpers.weightedArrayElement(
+      Array.from({ length: 4 }, (_, i) => {
+        const year = i + currentYear - 3;
+        const weight = [0.1, 0.2, 0.3, 0.4][i];
+        return { value: year, weight };
+      }),
+    ),
+  );
   return d;
 }
 
-// Derive event times from meetup created + duration
-function getEventTimesFromMeetup(meetupEvent) {
+// Derive created_at, start_time, end_time preserving original offsets
+function deriveTimesFromMeetup(meetupEvent) {
   const createdStr = meetupEvent.created;
+  const eventTimeStr = meetupEvent.event_time;
   const durationStr = meetupEvent.duration;
 
-  // Parse created timestamp
-  let start = createdStr ? new Date(createdStr.replace(" ", "T")) : new Date();
-  start = adjustToRecentYear(start);
+  const originalCreated = createdStr ? new Date(createdStr.replace(' ', 'T')) : new Date();
+  const originalEventTime = eventTimeStr ? new Date(eventTimeStr.replace(' ', 'T')) : new Date(originalCreated.getTime() + 24*3600*1000);
 
-  // Duration in seconds (fallback to 1-4 hours)
+  const offsetMs = originalEventTime.getTime() - originalCreated.getTime();
+
+  const createdAt = adjustToRecentYear(originalCreated);
+
+  const startTime = new Date(createdAt.getTime() + Math.max(0, offsetMs));
+
   const durationSec = Number(durationStr);
   const fallbackHours = faker.number.int({ min: 1, max: 4 });
-  const end = new Date(
-    start.getTime() +
-      (durationSec > 0 ? durationSec * 1000 : fallbackHours * 3600 * 1000),
+  const endTime = new Date(
+    startTime.getTime() + (durationSec > 0 ? durationSec * 1000 : fallbackHours * 3600 * 1000)
   );
 
-  return { startTime: start, endTime: end };
-}
-
-// Derive created_at from meetup created, adjusted to recent year
-function getCreatedAtFromMeetup(meetupEvent) {
-  const createdStr = meetupEvent.created;
-  let created = createdStr
-    ? new Date(createdStr.replace(" ", "T"))
-    : new Date();
-  created = adjustToRecentYear(created);
-  return created;
+  return { createdAt, startTime, endTime };
 }
 
 // Main function to generate events
 async function generateEvents(meetupEvents, userCount, groupCount, venueCount) {
   const events = [];
   const usedTitles = new Set();
-  
+
   // Preload existing groups and venues for stable mappings
   const groupNameToId = new Map();
-  const venueList = await db.manyOrNone('SELECT venue_id, name, building, location FROM jojo.venue');
+  const venueList = await db.manyOrNone(
+    "SELECT venue_id, name, building, location FROM jojo.venue",
+  );
   const venueCountActual = venueList.length;
-  
+
   // Load existing groups into map
-  const existingGroups = await db.manyOrNone('SELECT group_id, name FROM jojo."group"');
+  const existingGroups = await db.manyOrNone(
+    'SELECT group_id, name FROM jojo."group"',
+  );
   for (const g of existingGroups) groupNameToId.set(g.name, g.group_id);
-  
+
   async function ensureGroupIdByName(name) {
     if (groupNameToId.has(name)) return groupNameToId.get(name);
     // Default category: 'club'
     const inserted = await db.one(
       'INSERT INTO jojo."group" (name, category) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING group_id',
-      [name, 'club']
+      [name, "club"],
     );
     groupNameToId.set(name, inserted.group_id);
     return inserted.group_id;
@@ -293,16 +294,10 @@ async function generateEvents(meetupEvents, userCount, groupCount, venueCount) {
     const eventName = meetupEvent.event_name || meetupEvent.name || "";
     const description = meetupEvent.description || "";
 
-    // Skip if no event name
     if (!eventName) continue;
 
-    // Classify event type
     const eventType = classifyEvent(eventName, description);
-
-    // Generate Chinese title
     let title = generateChineseTitle(eventType, eventName);
-
-    // Ensure unique title by appending number if needed
     let uniqueTitle = title;
     let counter = 1;
     while (usedTitles.has(uniqueTitle)) {
@@ -312,60 +307,68 @@ async function generateEvents(meetupEvents, userCount, groupCount, venueCount) {
     usedTitles.add(uniqueTitle);
     title = uniqueTitle;
 
-    // Generate content
     const content = generateContent(description, eventType);
+    const { startTime, endTime, createdAt } = deriveTimesFromMeetup(meetupEvent);
 
-    // Generate times based on meetup created + duration, adjusted to recent year
-    const { startTime, endTime } = getEventTimesFromMeetup(meetupEvent);
-    const createdAt = getCreatedAtFromMeetup(meetupEvent);
-
-    // Random owner (user_id from 1 to userCount)
     const ownerId = faker.number.int({ min: 1, max: userCount });
 
     // Group mapping: use group.who; if 'Members' => public
-    const who = (meetupEvent["group.who"] || meetupEvent.group_who || '').trim();
+    const who = (
+      meetupEvent["group.who"] ||
+      meetupEvent.group_who ||
+      ""
+    ).trim();
     let groupId = null;
-    if (who && who.toLowerCase() !== 'members') {
+    if (who && who.toLowerCase() !== "members") {
       groupId = await ensureGroupIdByName(who);
     }
 
     // Capacity (2-30 people)
     const capacity = faker.number.int({ min: 2, max: 30 });
 
-    // Location: map meetup venue_id deterministically to our venue list
+    // Venue mapping: if venue.state == 'not_found' => no venue, keep text location; else assign venue_id and set location_desc NULL
     let locationDesc = faker.helpers.arrayElement(NTU_LOCATIONS);
+    let venueId = null;
+    const venueState = (
+      meetupEvent["venue.state"] ||
+      meetupEvent.venue_state ||
+      ""
+    ).toLowerCase();
     const meetupVenueIdStr = meetupEvent.venue_id || meetupEvent["venue_id"];
     const meetupVenueIdNum = Number(meetupVenueIdStr);
-    if (!Number.isNaN(meetupVenueIdNum) && venueCountActual > 0) {
+    if (
+      venueState &&
+      venueState !== "not_found" &&
+      !Number.isNaN(meetupVenueIdNum) &&
+      venueCountActual > 0
+    ) {
       const mappedIndex = Math.abs(meetupVenueIdNum) % venueCountActual;
       const v = venueList[mappedIndex];
       if (v) {
-        locationDesc = `${v.name}${v.location ? ' ' + v.location : ''}`.substring(0, 255);
+        venueId = v.venue_id;
+        locationDesc = null;
       }
     }
 
-    // Need book (20% of events need venue booking)
-    const needBook = faker.datatype.boolean({ probability: 0.2 });
-
     // Status derived from time: past => Closed, upcoming/ongoing => Open with small chance Cancelled
     const now = new Date();
-    let status = 'Open';
+    let status = "Open";
     if (endTime <= now) {
-      status = 'Closed';
+      status = "Closed";
     } else {
       const cancelChance = faker.number.float({ min: 0, max: 1 });
-      if (cancelChance < 0.05) status = 'Cancelled';
+      if (cancelChance < 0.05) status = "Cancelled";
     }
 
     events.push({
       owner_id: ownerId,
       group_id: groupId,
       type_name: eventType,
-      need_book: needBook,
       title: title.substring(0, 100), // Ensure title fits VARCHAR(100)
       content,
       capacity,
       location_desc: locationDesc,
+      venue_id: venueId,
       start_time: startTime,
       end_time: endTime,
       status,
@@ -398,11 +401,11 @@ async function insertEvents(events) {
       "owner_id",
       "group_id",
       "type_name",
-      "need_book",
       "title",
       "content",
       "capacity",
       "location_desc",
+      "venue_id",
       "start_time",
       "end_time",
       "status",
@@ -480,7 +483,7 @@ async function main() {
   );
   console.log(`Generated ${events.length} event records`);
 
-  if (DRY_RUN && !INSERT) {
+  if (DRY_RUN) {
     console.log(
       `[dry] Generated ${events.length} EVENT records (not inserting):`,
     );
@@ -489,7 +492,7 @@ async function main() {
       events.slice(0, 10).map((e) => {
         const { content, ...rest } = e;
         content.length > 50 && (e.content = content.substring(0, 47) + "...");
-        return {...rest, content: e.content};
+        return { ...rest, content: e.content };
       }),
     );
 
@@ -503,33 +506,24 @@ async function main() {
     return;
   }
 
-  if (INSERT) {
-    try {
-      // First insert event types
-      console.log("Inserting event types...");
-      await insertEventTypes();
+  try {
+    // First insert event types
+    console.log("Inserting event types...");
+    await insertEventTypes();
 
-      // Then insert events
-      console.log("Inserting events...");
-      const inserted = await insertEvents(events);
-      console.log(
-        `Successfully inserted ${inserted} EVENT records into jojo.event`,
-      );
-    } catch (error) {
-      console.error("Error inserting events:", error);
-      throw error;
-    } finally {
-      await db.$pool.end();
-    }
-    return;
+    // Then insert events
+    console.log("Inserting events...");
+    const inserted = await insertEvents(events);
+    console.log(
+      `Successfully inserted ${inserted} EVENT records into jojo.event`,
+    );
+  } catch (error) {
+    console.error("Error inserting events:", error);
+    throw error;
+  } finally {
+    await db.$pool.end();
   }
-
-  // Default: just show stats
-  console.log(`Generated ${events.length} EVENT records`);
-  console.log(
-    "Use --dry to see sample records, or --insert to insert into database",
-  );
-  await db.$pool.end();
+  return;
 }
 
 main().catch((err) => {

@@ -49,6 +49,7 @@ CREATE TABLE IF NOT EXISTS jojo.EVENT (
   content TEXT,
   capacity INTEGER,
   location_desc VARCHAR(255),
+  venue_id BIGINT,
   start_time TIMESTAMP NOT NULL,
   end_time TIMESTAMP NOT NULL,
   status event_status_enum DEFAULT 'Open',
