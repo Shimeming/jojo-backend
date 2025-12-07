@@ -248,9 +248,22 @@ function deriveTimesFromMeetup(meetupEvent) {
 
   const offsetMs = originalEventTime.getTime() - originalCreated.getTime();
 
-  const createdAt = adjustToRecentYear(originalCreated);
+  let createdAt = adjustToRecentYear(originalCreated);
 
-  const startTime = new Date(createdAt.getTime() + Math.max(0, offsetMs));
+  // Clamp start offset to within 2 months from createdAt
+  const maxOffsetMs = 35 * 24 * 3600 * 1000; // ~35 days
+  const clampedOffset = Math.min(Math.max(0, offsetMs), maxOffsetMs);
+  let startTime = new Date(createdAt.getTime() + clampedOffset);
+
+  // Apply small random shifts (< 7 days) to createdAt and startTime
+  const maxShiftMs = 7 * 24 * 3600 * 1000 - 1; // strictly less than 7 days
+  const createdShift = faker.number.int({ min: -maxShiftMs, max: maxShiftMs });
+  const startShift = faker.number.int({ min: -maxShiftMs, max: maxShiftMs });
+  createdAt = new Date(createdAt.getTime() + createdShift);
+  startTime = new Date(startTime.getTime() + startShift);
+  while (startTime.getTime() <= createdAt.getTime()) {
+    startTime = new Date(startTime.getTime() + faker.number.int({ min: 0, max: maxShiftMs }));
+  }
 
   const durationSec = Number(durationStr);
   const fallbackHours = faker.number.int({ min: 1, max: 4 });
@@ -514,8 +527,8 @@ async function main() {
     console.log("Inserting event types...");
     await insertEventTypes();
 
-    // Then insert events
     console.log("Inserting events...");
+    events.sort((a, b) => a.start_time.getTime() - b.start_time.getTime());
     const inserted = await insertEvents(events);
     console.log(
       `Successfully inserted ${inserted} EVENT records into jojo.event`,
