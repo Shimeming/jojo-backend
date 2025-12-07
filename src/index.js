@@ -2,6 +2,7 @@ import express from 'express';
 import { db, connectMongo, mongoDb } from './lib/db.js';
 import { loadEnv } from './lib/env.js';
 import adminRoutes from './routes/adminRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 loadEnv();
 
@@ -17,6 +18,7 @@ app.use(express.json());
 // 2. Routes
 // ==========================================
 app.use('/api/admin', adminRoutes);
+app.use('/api/auth', authRoutes);
 
 // ==========================================
 // 3. Event APIs
@@ -30,10 +32,10 @@ app.get('/api/events', async (req, res) => {
     try {
         // 基礎查詢：撈取活動 + 主辦人名字 + 群組名字
         let query = `
-            SELECT e.*, u."Name" as "Owner_name", g."Name" as "Group_name"
-            FROM "EVENT" e
-            JOIN "USER" u ON e."Owner_id" = u."User_id"
-            LEFT JOIN "GROUP" g ON e."Group_id" = g."Group_id"
+            SELECT e.*, u.name as owner_name, g.name as group_name
+            FROM jojo.EVENT e
+            JOIN jojo.USER u ON e.owner_id = u.user_id
+            LEFT JOIN jojo.GROUP g ON e.group_id = g.group_id
             WHERE 1=1 
         `; 
         
@@ -42,29 +44,29 @@ app.get('/api/events', async (req, res) => {
 
         // 1. 類型篩選
         if (type && type !== '全部') {
-            query += ` AND e."Type_name" = $${paramIndex}`;
+            query += ` AND e.type_name = $${paramIndex}`;
             params.push(type);
             paramIndex++;
         }
 
         // 2. 群組/系所篩選
         if (groupId && groupId !== 'all') {
-            query += ` AND e."Group_id" = $${paramIndex}`;
+            query += ` AND e.group_id = $${paramIndex}`;
             params.push(groupId);
             paramIndex++;
         }
 
         // 3. 一鍵推薦 (查詢 PREFERENCE 表)
         if (recommend === 'true' && userId) {
-            query += ` AND e."Type_name" IN (
-                SELECT "Type_name" FROM "PREFERENCE" WHERE "User_id" = $${paramIndex}
+            query += ` AND e.type_name IN (
+                SELECT type_name FROM jojo.PREFERENCE WHERE user_id = $${paramIndex}
             )`;
             params.push(userId);
             paramIndex++;
         }
 
         // 排序：依時間排序
-        query += ` ORDER BY e."Start_time" ASC`;
+        query += ` ORDER BY e.start_time ASC`;
 
         const events = await db.manyOrNone(query, params);
         res.json(events);
@@ -84,33 +86,36 @@ app.get('/api/users/:id/profile', async (req, res) => {
     const userId = req.params.id;
     try {
         // 1. 基本資料
-        const user = await db.oneOrNone('SELECT * FROM "USER" WHERE "User_id" = $1', [userId]);
+        const user = await db.oneOrNone('SELECT * FROM jojo.USER WHERE user_id = $1', [userId]);
         
         if (!user) return res.status(404).json({ error: 'User not found' });
 
         // 2. 所屬群組 (JOIN 查詢)
         const groups = await db.manyOrNone(`
-            SELECT g.* FROM "GROUP" g 
-            JOIN "USER_GROUP" ug ON g."Group_id" = ug."Group_id" 
-            WHERE ug."User_id" = $1
+            SELECT g.group_id as id, g.name, g.category as type 
+            FROM jojo.GROUP g 
+            JOIN jojo.USER_GROUP ug ON g.group_id = ug.group_id 
+            WHERE ug.user_id = $1
         `, [userId]);
         
         // 3. 主辦過的活動
         const hosted = await db.manyOrNone(`
-            SELECT * FROM "EVENT" WHERE "Owner_id" = $1
+            SELECT * FROM jojo.EVENT WHERE owner_id = $1
         `, [userId]);
 
         // 4. 興趣 (用於推薦)
         const interests = await db.manyOrNone(`
-            SELECT "Type_name" FROM "PREFERENCE" WHERE "User_id" = $1
+            SELECT type_name FROM jojo.PREFERENCE WHERE user_id = $1
         `, [userId]);
 
         res.json({
-            ...user,
+            name: user.name,
+            email: user.email,
+            avatar: '👤',
             groups: groups || [],
             hostedEvents: hosted || [],
             joinedEvents: [], // 暫時留空或自行實作 JOIN_RECORD 查詢
-            interests: interests || []
+            interests: interests.map(i => i.type_name) || []
         });
     } catch (err) {
         console.error(err);
@@ -121,7 +126,7 @@ app.get('/api/users/:id/profile', async (req, res) => {
 // --- C. 取得場地列表 (建立活動用) ---
 app.get('/api/venues', async (req, res) => {
     try {
-        const venues = await db.manyOrNone('SELECT * FROM "VENUE"');
+        const venues = await db.manyOrNone('SELECT * FROM jojo.VENUE');
         res.json(venues);
     } catch (err) {
         console.error(err);
@@ -153,7 +158,7 @@ app.post('/api/events', async (req, res) => {
         
         // 驗證 userId 是否存在於資料庫
         const userExists = await db.oneOrNone(
-            'SELECT user_id FROM jojo."USER" WHERE user_id = $1',
+            'SELECT user_id FROM jojo.USER WHERE user_id = $1',
             [userId]
         );
         
@@ -193,7 +198,7 @@ app.post('/api/events/:id/join', async (req, res) => {
     const { userId } = req.body;
     try {
         await db.none(
-            `INSERT INTO "JOIN_RECORD" ("Event_id", "User_id", "Status", "Join_time") 
+            `INSERT INTO jojo.JOIN_RECORD (event_id, user_id, status, join_time) 
              VALUES ($1, $2, 'confirmed', NOW())`,
             [eventId, userId]
         );

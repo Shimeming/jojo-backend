@@ -13,7 +13,7 @@ router.post('/login', async (req, res) => {
     
     try {
         const admin = await db.oneOrNone(
-            'SELECT * FROM "ADMIN" WHERE "Username" = $1 AND "Password" = $2',
+            'SELECT * FROM jojo.ADMIN_USER WHERE name = $1 AND password_hash = $2',
             [username, password]
         );
         
@@ -23,8 +23,8 @@ router.post('/login', async (req, res) => {
         
         res.json({ 
             success: true, 
-            adminId: admin.Admin_id,
-            name: admin.Name 
+            adminId: admin.user_id,
+            name: admin.name 
         });
     } catch (err) {
         console.error('Admin Login Error:', err);
@@ -36,9 +36,9 @@ router.post('/login', async (req, res) => {
 router.get('/event-types', async (req, res) => {
     try {
         const types = await db.manyOrNone(`
-            SELECT "Type_name", COUNT(*) as event_count 
-            FROM "EVENT" 
-            GROUP BY "Type_name"
+            SELECT type_name, COUNT(*) as event_count 
+            FROM jojo.EVENT 
+            GROUP BY type_name
             ORDER BY event_count DESC
         `);
         res.json(types);
@@ -57,7 +57,7 @@ router.post('/event-types', async (req, res) => {
     
     try {
         const exists = await db.oneOrNone(
-            'SELECT 1 FROM "EVENT" WHERE "Type_name" = $1 LIMIT 1',
+            'SELECT 1 FROM jojo.EVENT_TYPE WHERE name = $1 LIMIT 1',
             [typeName]
         );
         
@@ -66,8 +66,7 @@ router.post('/event-types', async (req, res) => {
         }
         
         await db.none(
-            `INSERT INTO "EVENT" ("Owner_id", "Type_name", "Title", "Content", "Capacity", "Start_time", "End_time") 
-             VALUES (1, $1, '範例活動', '此為系統建立的範例活動', 999, NOW(), NOW())`,
+            `INSERT INTO jojo.EVENT_TYPE (name) VALUES ($1)`,
             [typeName]
         );
         
@@ -83,7 +82,7 @@ router.delete('/event-types/:name', async (req, res) => {
     
     try {
         const count = await db.one(
-            'SELECT COUNT(*) as count FROM "EVENT" WHERE "Type_name" = $1',
+            'SELECT COUNT(*) as count FROM jojo.EVENT WHERE type_name = $1',
             [typeName]
         );
         
@@ -106,13 +105,13 @@ router.get('/groups', async (req, res) => {
         const groups = await db.manyOrNone(`
             SELECT 
                 g.*,
-                COUNT(DISTINCT ug."User_id") as member_count,
-                COUNT(DISTINCT e."Event_id") as event_count
-            FROM "GROUP" g
-            LEFT JOIN "USER_GROUP" ug ON g."Group_id" = ug."Group_id"
-            LEFT JOIN "EVENT" e ON g."Group_id" = e."Group_id"
-            GROUP BY g."Group_id"
-            ORDER BY g."Name"
+                COUNT(DISTINCT ug.user_id) as member_count,
+                COUNT(DISTINCT e.event_id) as event_count
+            FROM jojo.GROUP g
+            LEFT JOIN jojo.USER_GROUP ug ON g.group_id = ug.group_id
+            LEFT JOIN jojo.EVENT e ON g.group_id = e.group_id
+            GROUP BY g.group_id
+            ORDER BY g.name
         `);
         res.json(groups);
     } catch (err) {
@@ -130,14 +129,14 @@ router.post('/groups', async (req, res) => {
     
     try {
         const result = await db.one(
-            `INSERT INTO "GROUP" ("Name", "Description") 
-             VALUES ($1, $2) RETURNING "Group_id"`,
-            [groupName, description || '']
+            `INSERT INTO jojo.GROUP (name, category) 
+             VALUES ($1, 'club') RETURNING group_id`,
+            [groupName]
         );
         
         res.json({ 
             success: true, 
-            groupId: result.Group_id,
+            groupId: result.group_id,
             message: `群組「${groupName}」已建立` 
         });
     } catch (err) {
@@ -154,7 +153,7 @@ router.delete('/groups/:id', async (req, res) => {
     
     try {
         const eventCount = await db.one(
-            'SELECT COUNT(*) as count FROM "EVENT" WHERE "Group_id" = $1',
+            'SELECT COUNT(*) as count FROM jojo.EVENT WHERE group_id = $1',
             [groupId]
         );
         
@@ -164,8 +163,8 @@ router.delete('/groups/:id', async (req, res) => {
             });
         }
         
-        await db.none('DELETE FROM "USER_GROUP" WHERE "Group_id" = $1', [groupId]);
-        await db.none('DELETE FROM "GROUP" WHERE "Group_id" = $1', [groupId]);
+        await db.none('DELETE FROM jojo.USER_GROUP WHERE group_id = $1', [groupId]);
+        await db.none('DELETE FROM jojo.GROUP WHERE group_id = $1', [groupId]);
         
         res.json({ success: true, message: '群組已刪除' });
     } catch (err) {
@@ -180,13 +179,13 @@ router.get('/users', async (req, res) => {
         const users = await db.manyOrNone(`
             SELECT 
                 u.*,
-                COUNT(DISTINCT e."Event_id") as hosted_count,
-                COUNT(DISTINCT jr."Event_id") as joined_count
-            FROM "USER" u
-            LEFT JOIN "EVENT" e ON u."User_id" = e."Owner_id"
-            LEFT JOIN "JOIN_RECORD" jr ON u."User_id" = jr."User_id"
-            GROUP BY u."User_id"
-            ORDER BY u."User_id"
+                COUNT(DISTINCT e.event_id) as hosted_count,
+                COUNT(DISTINCT jr.event_id) as joined_count
+            FROM jojo.USER u
+            LEFT JOIN jojo.EVENT e ON u.user_id = e.owner_id
+            LEFT JOIN jojo.JOIN_RECORD jr ON u.user_id = jr.user_id
+            GROUP BY u.user_id
+            ORDER BY u.user_id
         `);
         res.json(users);
     } catch (err) {
@@ -199,11 +198,11 @@ router.delete('/users/:id', async (req, res) => {
     const userId = req.params.id;
     
     try {
-        await db.none('DELETE FROM "JOIN_RECORD" WHERE "User_id" = $1', [userId]);
-        await db.none('DELETE FROM "USER_GROUP" WHERE "User_id" = $1', [userId]);
-        await db.none('DELETE FROM "PREFERENCE" WHERE "User_id" = $1', [userId]);
-        await db.none('UPDATE "EVENT" SET "Owner_id" = NULL WHERE "Owner_id" = $1', [userId]);
-        await db.none('DELETE FROM "USER" WHERE "User_id" = $1', [userId]);
+        await db.none('DELETE FROM jojo.JOIN_RECORD WHERE user_id = $1', [userId]);
+        await db.none('DELETE FROM jojo.USER_GROUP WHERE user_id = $1', [userId]);
+        await db.none('DELETE FROM jojo.PREFERENCE WHERE user_id = $1', [userId]);
+        await db.none('UPDATE jojo.EVENT SET owner_id = NULL WHERE owner_id = $1', [userId]);
+        await db.none('DELETE FROM jojo.USER WHERE user_id = $1', [userId]);
         
         res.json({ success: true, message: '使用者已刪除' });
     } catch (err) {
@@ -218,15 +217,15 @@ router.get('/events', async (req, res) => {
         const events = await db.manyOrNone(`
             SELECT 
                 e.*,
-                u."Name" as owner_name,
-                g."Name" as group_name,
-                COUNT(jr."User_id") as participant_count
-            FROM "EVENT" e
-            LEFT JOIN "USER" u ON e."Owner_id" = u."User_id"
-            LEFT JOIN "GROUP" g ON e."Group_id" = g."Group_id"
-            LEFT JOIN "JOIN_RECORD" jr ON e."Event_id" = jr."Event_id"
-            GROUP BY e."Event_id", u."Name", g."Name"
-            ORDER BY e."Start_time" DESC
+                u.name as owner_name,
+                g.name as group_name,
+                COUNT(jr.user_id) as participant_count
+            FROM jojo.EVENT e
+            LEFT JOIN jojo.USER u ON e.owner_id = u.user_id
+            LEFT JOIN jojo.GROUP g ON e.group_id = g.group_id
+            LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
+            GROUP BY e.event_id, u.name, g.name
+            ORDER BY e.start_time DESC
         `);
         res.json(events);
     } catch (err) {
@@ -239,9 +238,9 @@ router.delete('/events/:id', async (req, res) => {
     const eventId = req.params.id;
     
     try {
-        await db.none('DELETE FROM "JOIN_RECORD" WHERE "Event_id" = $1', [eventId]);
-        await db.none('DELETE FROM "VENUE_BOOKING" WHERE "Event_id" = $1', [eventId]);
-        await db.none('DELETE FROM "EVENT" WHERE "Event_id" = $1', [eventId]);
+        await db.none('DELETE FROM jojo.JOIN_RECORD WHERE event_id = $1', [eventId]);
+        await db.none('DELETE FROM jojo.VENUE_BOOKING WHERE event_id = $1', [eventId]);
+        await db.none('DELETE FROM jojo.EVENT WHERE event_id = $1', [eventId]);
         
         res.json({ success: true, message: '活動已刪除' });
     } catch (err) {
@@ -253,17 +252,17 @@ router.delete('/events/:id', async (req, res) => {
 // --- 數據分析 ---
 router.get('/analytics/overview', async (req, res) => {
     try {
-        const userCount = await db.one('SELECT COUNT(*) as count FROM "USER"');
-        const eventCount = await db.one('SELECT COUNT(*) as count FROM "EVENT"');
-        const groupCount = await db.one('SELECT COUNT(*) as count FROM "GROUP"');
-        const participationCount = await db.one('SELECT COUNT(*) as count FROM "JOIN_RECORD"');
+        const userCount = await db.one('SELECT COUNT(*) as count FROM jojo.USER');
+        const eventCount = await db.one('SELECT COUNT(*) as count FROM jojo.EVENT');
+        const groupCount = await db.one('SELECT COUNT(*) as count FROM jojo.GROUP');
+        const participationCount = await db.one('SELECT COUNT(*) as count FROM jojo.JOIN_RECORD');
         const thisMonthEvents = await db.one(`
-            SELECT COUNT(*) as count FROM "EVENT" 
-            WHERE DATE_TRUNC('month', "Start_time") = DATE_TRUNC('month', CURRENT_DATE)
+            SELECT COUNT(*) as count FROM jojo.EVENT 
+            WHERE DATE_TRUNC('month', start_time) = DATE_TRUNC('month', CURRENT_DATE)
         `);
         const thisMonthActiveUsers = await db.one(`
-            SELECT COUNT(DISTINCT "User_id") as count FROM "JOIN_RECORD" 
-            WHERE DATE_TRUNC('month', "Join_time") = DATE_TRUNC('month', CURRENT_DATE)
+            SELECT COUNT(DISTINCT user_id) as count FROM jojo.JOIN_RECORD 
+            WHERE DATE_TRUNC('month', join_time) = DATE_TRUNC('month', CURRENT_DATE)
         `);
         
         res.json({
@@ -286,26 +285,26 @@ router.get('/analytics/events-by-type', async (req, res) => {
     try {
         let query = `
             SELECT 
-                "Type_name" as type,
+                type_name as type,
                 COUNT(*) as event_count,
-                SUM("Capacity") as total_capacity,
-                COUNT(DISTINCT "Owner_id") as unique_hosts,
-                ROUND(AVG("Capacity"), 2) as avg_capacity
-            FROM "EVENT"
+                SUM(capacity) as total_capacity,
+                COUNT(DISTINCT owner_id) as unique_hosts,
+                ROUND(AVG(capacity), 2) as avg_capacity
+            FROM jojo.EVENT
             WHERE 1=1
         `;
         
         const params = [];
         if (startDate) {
             params.push(startDate);
-            query += ` AND "Start_time" >= $${params.length}::timestamp`;
+            query += ` AND start_time >= $${params.length}::timestamp`;
         }
         if (endDate) {
             params.push(endDate);
-            query += ` AND "Start_time" <= $${params.length}::timestamp`;
+            query += ` AND start_time <= $${params.length}::timestamp`;
         }
         
-        query += ' GROUP BY "Type_name" ORDER BY event_count DESC';
+        query += ' GROUP BY type_name ORDER BY event_count DESC';
         
         const data = await db.manyOrNone(query, params);
         res.json(data);
@@ -319,17 +318,17 @@ router.get('/analytics/group-participation', async (req, res) => {
     try {
         const data = await db.manyOrNone(`
             SELECT 
-                g."Name" as group_name,
-                g."Group_id" as group_id,
-                COUNT(DISTINCT e."Event_id") as event_count,
-                COUNT(DISTINCT ug."User_id") as member_count,
-                COUNT(DISTINCT jr."User_id") as active_members
-            FROM "GROUP" g
-            LEFT JOIN "EVENT" e ON g."Group_id" = e."Group_id"
-            LEFT JOIN "USER_GROUP" ug ON g."Group_id" = ug."Group_id"
-            LEFT JOIN "JOIN_RECORD" jr ON e."Event_id" = jr."Event_id"
-            GROUP BY g."Group_id", g."Name"
-            HAVING COUNT(DISTINCT e."Event_id") > 0 OR COUNT(DISTINCT ug."User_id") > 0
+                g.name as group_name,
+                g.group_id as group_id,
+                COUNT(DISTINCT e.event_id) as event_count,
+                COUNT(DISTINCT ug.user_id) as member_count,
+                COUNT(DISTINCT jr.user_id) as active_members
+            FROM jojo.GROUP g
+            LEFT JOIN jojo.EVENT e ON g.group_id = e.group_id
+            LEFT JOIN jojo.USER_GROUP ug ON g.group_id = ug.group_id
+            LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
+            GROUP BY g.group_id, g.name
+            HAVING COUNT(DISTINCT e.event_id) > 0 OR COUNT(DISTINCT ug.user_id) > 0
             ORDER BY event_count DESC
         `);
         res.json(data);
@@ -345,12 +344,12 @@ router.get('/analytics/user-activity', async (req, res) => {
     try {
         const data = await db.manyOrNone(`
             SELECT 
-                DATE("Join_time") as date,
-                COUNT(DISTINCT "User_id") as active_users,
+                DATE(join_time) as date,
+                COUNT(DISTINCT user_id) as active_users,
                 COUNT(*) as total_joins
-            FROM "JOIN_RECORD"
-            WHERE "Join_time" >= CURRENT_DATE - INTERVAL '${parseInt(days)} days'
-            GROUP BY DATE("Join_time")
+            FROM jojo.JOIN_RECORD
+            WHERE join_time >= CURRENT_DATE - INTERVAL '${parseInt(days)} days'
+            GROUP BY DATE(join_time)
             ORDER BY date DESC
         `);
         res.json(data);
@@ -364,16 +363,16 @@ router.get('/analytics/capacity-stats', async (req, res) => {
     try {
         const data = await db.manyOrNone(`
             SELECT 
-                e."Type_name" as type,
-                e."Event_id" as event_id,
-                e."Title" as title,
-                e."Capacity" as capacity,
-                COUNT(jr."User_id") as current_participants,
-                ROUND((COUNT(jr."User_id")::float / NULLIF(e."Capacity", 0)) * 100, 2) as fill_rate
-            FROM "EVENT" e
-            LEFT JOIN "JOIN_RECORD" jr ON e."Event_id" = jr."Event_id"
-            GROUP BY e."Event_id", e."Title", e."Type_name", e."Capacity"
-            HAVING e."Capacity" > 0
+                e.type_name as type,
+                e.event_id as event_id,
+                e.title as title,
+                e.capacity as capacity,
+                COUNT(jr.user_id) as current_participants,
+                ROUND((COUNT(jr.user_id)::float / NULLIF(e.capacity, 0)) * 100, 2) as fill_rate
+            FROM jojo.EVENT e
+            LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
+            GROUP BY e.event_id, e.title, e.type_name, e.capacity
+            HAVING e.capacity > 0
             ORDER BY fill_rate DESC
             LIMIT 20
         `);
@@ -388,15 +387,15 @@ router.get('/analytics/top-hosts', async (req, res) => {
     try {
         const data = await db.manyOrNone(`
             SELECT 
-                u."User_id" as user_id,
-                u."Name" as name,
-                COUNT(DISTINCT e."Event_id") as events_hosted,
-                COUNT(DISTINCT jr."User_id") as total_participants,
-                ROUND(AVG(e."Capacity"), 2) as avg_capacity
-            FROM "USER" u
-            JOIN "EVENT" e ON u."User_id" = e."Owner_id"
-            LEFT JOIN "JOIN_RECORD" jr ON e."Event_id" = jr."Event_id"
-            GROUP BY u."User_id", u."Name"
+                u.user_id as user_id,
+                u.name as name,
+                COUNT(DISTINCT e.event_id) as events_hosted,
+                COUNT(DISTINCT jr.user_id) as total_participants,
+                ROUND(AVG(e.capacity), 2) as avg_capacity
+            FROM jojo.USER u
+            JOIN jojo.EVENT e ON u.user_id = e.owner_id
+            LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
+            GROUP BY u.user_id, u.name
             ORDER BY events_hosted DESC
             LIMIT 10
         `);
