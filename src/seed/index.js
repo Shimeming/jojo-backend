@@ -2,6 +2,7 @@ import { db } from '../lib/db.js';
 import { loadEnv } from '../lib/env.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
 loadEnv();
@@ -13,7 +14,7 @@ const GENERATE_ONLY = args.includes('--generate-only');
 const FORCE = args.includes('--force');
 const COUNT_ARG = args.includes('--count') ? Number(args[args.indexOf('--count') + 1]) : undefined;
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname));
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 async function runSQLFromFile(fileName) {
   const sqlPath = path.resolve(ROOT, fileName);

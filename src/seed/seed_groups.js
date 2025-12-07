@@ -2,6 +2,7 @@ import { db, pgp } from '../lib/db.js';
 import { loadEnv } from '../lib/env.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 loadEnv();
 
@@ -40,8 +41,8 @@ function parseDepartmentsCSV(csvPath) {
   return Array.from(names);
 }
 
-const CSV_PATH = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+const CSV_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
   './department_people.csv'
 );
 const DEPARTMENTS = parseDepartmentsCSV(CSV_PATH);

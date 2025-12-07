@@ -2,6 +2,7 @@ import { db } from '../lib/db.js';
 import { loadEnv } from '../lib/env.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 loadEnv();
 
@@ -9,8 +10,8 @@ const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry');
 
 async function insertEventTypesFromCSV() {
-  const csvPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
+  const csvPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
     './seed_event_types.csv'
   );
   const raw = fs.readFileSync(csvPath, 'utf-8');

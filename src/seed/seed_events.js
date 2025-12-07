@@ -3,6 +3,7 @@ import { loadEnv } from "../lib/env.js";
 import { faker } from "@faker-js/faker";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { parse } from "csv-parse/sync";
 
 loadEnv();
@@ -432,8 +433,8 @@ async function insertEvents(events) {
 }
 
 async function insertEventTypes() {
-  const csvPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
+  const csvPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
     "./seed_event_types.csv",
   );
   const raw = fs.readFileSync(csvPath, "utf-8");
@@ -460,8 +461,8 @@ async function main() {
   console.log(`Generating ${COUNT} events from meetup data...`);
 
   // Load meetup events
-  const meetupCsvPath = path.resolve(
-    path.dirname(new URL(import.meta.url).pathname),
+  const meetupCsvPath = path.join(
+    path.dirname(fileURLToPath(import.meta.url)),
     "./meetup_data/events.csv",
   );
 
