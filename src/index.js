@@ -124,32 +124,59 @@ app.get('/api/venues', async (req, res) => {
 
 // --- D. 建立新活動 (POST) ---
 app.post('/api/events', async (req, res) => {
-    // 從 req.body 拿資料 (這就是為什麼要有 express.json())
-    const { title, typeId, content, capacity, date, Group_id, groupId } = req.body;
+    // 從 req.body 拿資料
+    const { userId, title, typeId, content, capacity, startTime, endTime, Group_id, groupId, locationName, venueId } = req.body;
     const finalGroupId = Group_id || groupId || null;
+    
     try {
-        // 這裡 Owner_id 先寫死為 1 (趙仲文 Demo)
+        // 驗證 userId
+        if (!userId) {
+            return res.status(400).json({ error: 'userId is required' });
+        }
+        
+        // 驗證時間格式
+        if (!startTime || !endTime) {
+            return res.status(400).json({ error: 'startTime and endTime are required' });
+        }
+        
+        // 驗證結束時間必須大於開始時間
+        if (new Date(endTime) <= new Date(startTime)) {
+            return res.status(400).json({ error: 'endTime must be after startTime' });
+        }
+        
+        // 驗證 userId 是否存在於資料庫
+        const userExists = await db.oneOrNone(
+            'SELECT user_id FROM jojo."USER" WHERE user_id = $1',
+            [userId]
+        );
+        
+        if (!userExists) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        
         const result = await db.one(
-            `INSERT INTO "EVENT" 
-                ("Owner_id", "Type_name", "Title", "Content", "Capacity", "Start_time", "End_time", "Group_id") 
+            `INSERT INTO jojo.EVENT 
+                (owner_id, type_name, title, content, capacity, start_time, end_time, group_id, location_desc, venue_id) 
              VALUES 
-                ($1, $2, $3, $4, $5, $6, $7, $8) 
-             RETURNING "Event_id"`,
+                ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+             RETURNING event_id`,
              [
-                1,                        // $1
-                typeId || '其他',          // $2
-                title,                    // $3
-                content,                  // $4
-                capacity,                 // $5
-                `${date} 10:00:00`,       // $6
-                `${date} 12:00:00`,       // $7
-                finalGroupId              // 
+                userId,                               // $1 owner_id (使用實際登入的 user_id)
+                typeId || '其他',                      // $2 type_name
+                title,                                // $3 title
+                content,                              // $4 content
+                capacity,                             // $5 capacity
+                startTime,                            // $6 start_time (TIMESTAMP)
+                endTime,                              // $7 end_time (TIMESTAMP)
+                finalGroupId,                         // $8 group_id
+                locationName || null,                 // $9 location_desc
+                venueId ? parseInt(venueId) : null    // $10 venue_id
             ]
         );
-        res.json({ success: true, eventId: result.Event_id });
+        res.json({ success: true, eventId: result.event_id });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Create failed' });
+        console.error('Create event error:', err);
+        res.status(500).json({ error: 'Create failed', details: err.message });
     }
 });
 
