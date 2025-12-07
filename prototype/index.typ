@@ -152,18 +152,18 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
   - 說明：代表使用者與活動間的多對多關係，用於記錄報名與參加狀態。
 - `VENUE`
   - 主鍵（PK）：Venue_id
-  - 屬性：Name, Building, Floor
+  - 屬性：Name, Building, Location
   - 說明：儲存教室、球場或其他可借場地的資訊，供活動建立時查詢。
 - `GROUP`
   - 主鍵（PK）：Group_id
-  - 屬性：Name
+  - 屬性：Name, Category
   - 說明：代表系所、宿舍或社團。活動若設定為群組限定，僅該群組成員可加入。
 - `PREFERENCE`
   - 主鍵（PK）：User_id, Type_name
   - 外鍵（FK）：User_id → USER(User_id)
   - 外鍵（FK）：Type_name → EVENT_TYPE(name)
   - 說明：使用者的偏好設定表，用於推薦使用者可能想參加的活動
-- `TYPE`
+- `EVENT_TYPE`
   - 主鍵（PK）：name
   - 說明：所有可能的活動類別
 
@@ -227,7 +227,7 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
   `User_id` 是主鍵 (超鍵)。Data Dictionary 中`Email` 和 `Phone` 欄位皆有 `Unique` 約束，因此它們也是候選鍵 (Candidate Keys)，故亦為超鍵。此表中所有功能相依的決定因子都是超鍵。
 - `GROUP` 資料表：
   `Group_id` 是主鍵 (超鍵)。`Name` 欄位有 `Unique` 約束，所以也是超鍵。
-- `TYPE` 資料表：`name` 是主鍵 (超鍵)，亦有 `Unique` 約束。
+- `EVENT_TYPE` 資料表：`name` 是主鍵 (超鍵)，亦有 `Unique` 約束。
 - `PREFERENCE` 資料表：
   唯一的功能相依是 (`User_id`)$->$`Type_name`。其決定因子是主鍵，故也是超鍵。
 - `JOIN_RECORD` 資料表：
