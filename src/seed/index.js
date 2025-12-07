@@ -60,19 +60,15 @@ async function clearDatabase() {
 }
 
 async function generateAll() {
-  // Seed event types first
-  await runNodeScript('./seed_event_types.js', ['--insert']);
-  // Seed core entities
+  await runNodeScript('./seed_event_types.js');
   await runNodeScript('./seed_users.js');
   await runNodeScript('./seed_groups.js');
-  await runNodeScript('./seed_venues.js', ['--insert']);
-  // Link users to groups
+  await runNodeScript('./seed_venues.js');
   await runNodeScript('./seed_user_groups.js');
-  // Seed user preferences
-  await runNodeScript('./seed_preferences.js', ['--insert']);
-  // Seed events; pass count if provided
+  await runNodeScript('./seed_preferences.js');
   const eventArgs = ['--count', String(COUNT_ARG ?? 10000)];
   await runNodeScript('./seed_events.js', eventArgs);
+  await runNodeScript('./seed_join_records.js');
 }
 
 async function main() {

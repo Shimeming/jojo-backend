@@ -6,7 +6,6 @@ loadEnv();
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry");
-const DO_INSERT = args.includes("--insert") || !DRY_RUN;
 const MIN_PER_USER = args.includes("--min") ? Number(args[args.indexOf("--min") + 1]) : 0;
 const MAX_PER_USER = args.includes("--max") ? Number(args[args.indexOf("--max") + 1]) : 3;
 
@@ -96,10 +95,8 @@ async function main() {
     return;
   }
 
-  if (DO_INSERT) {
-    await insertPreferences(rows);
-    console.log('Done inserting preferences.');
-  }
+  await insertPreferences(rows);
+  console.log('Done inserting preferences.');
 }
 
 main().then(() => db.$pool.end()).catch(async (err) => {
