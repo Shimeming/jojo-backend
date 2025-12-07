@@ -80,10 +80,8 @@ CREATE TABLE IF NOT EXISTS jojo.VENUE (
 -- PREFERENCE
 CREATE TABLE IF NOT EXISTS jojo.PREFERENCE (
   user_id INTEGER NOT NULL,
-  priority INTEGER NOT NULL,
   type_name VARCHAR(50) NOT NULL,
-  PRIMARY KEY (user_id, priority),
+  PRIMARY KEY (user_id, type_name),
   FOREIGN KEY (user_id) REFERENCES jojo.USER(user_id) ON DELETE CASCADE,
-  FOREIGN KEY (type_name) REFERENCES jojo.EVENT_TYPE(name) ON DELETE CASCADE,
-  CONSTRAINT priority_check CHECK (priority > 0)
+  FOREIGN KEY (type_name) REFERENCES jojo.EVENT_TYPE(name) ON DELETE CASCADE
 );

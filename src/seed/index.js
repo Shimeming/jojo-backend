@@ -67,6 +67,8 @@ async function generateAll() {
   await runNodeScript('./seed_venues.js', ['--insert']);
   // Link users to groups
   await runNodeScript('./seed_user_groups.js');
+  // Seed user preferences
+  await runNodeScript('./seed_preferences.js', ['--insert']);
   // Seed events; pass count if provided
   const eventArgs = ['--count', String(COUNT_ARG ?? 10000)];
   await runNodeScript('./seed_events.js', eventArgs);
