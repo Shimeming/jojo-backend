@@ -10,7 +10,7 @@ const MAX_PER_EVENT = args.includes("--max-per-event") ? Number(args[args.indexO
 
 async function fetchEventsAndUsers() {
   const events = await db.manyOrNone(`
-    SELECT event_id, owner_id, capacity, start_time, end_time, status
+    SELECT event_id, owner_id, capacity, start_time, end_time, status, created_at
     FROM jojo.event
     ORDER BY event_id
   `);
@@ -70,10 +70,15 @@ function buildJoinRows(events, users) {
     const cap = ev.capacity ?? MAX_PER_EVENT;
     const targetCount = decideJoinCount(cap, ev.status);
     const participants = pickParticipants(users, targetCount, undefined);
-    const joinWindowStart = new Date(ev.start_time);
-    joinWindowStart.setDate(joinWindowStart.getDate() - 14);
+    const created = new Date(ev.created_at);
+    const start = new Date(ev.start_time);
+    const now = new Date();
+    const toTime = start < now ? start : now;
+    // If created is after toTime (edge case), nudge toTime forward by 1 minute
+    const fromTime = created;
+    const safeToTime = fromTime > toTime ? new Date(fromTime.getTime() + 60 * 1000) : toTime;
     for (const uid of participants.slice(0, cap)) {
-      const joinTime = faker.date.between({ from: joinWindowStart, to: new Date(ev.start_time) });
+      const joinTime = faker.date.between({ from: fromTime, to: safeToTime });
       const status = statusForJoin(ev.status);
       rows.push({ event_id: ev.event_id, user_id: uid, join_time: joinTime, status });
     }

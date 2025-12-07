@@ -113,7 +113,7 @@ function ntuStudentId(deptCode, yearLevel, index) {
   const admissionYear2D = String(admissionYear).slice(-2);
   const deptCode3D = deptCode.slice(1, 4);
   const serialNumber = String(index + 1).padStart(3, '0');
-  return `${admissionYear2D}${deptCode3D}${serialNumber}`;
+  return `b${admissionYear2D}${deptCode3D}${serialNumber}`;
 }
 
 
