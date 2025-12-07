@@ -188,34 +188,37 @@ function generateChineseTitle(eventType, originalTitle) {
   return title;
 }
 
-function generateContent(meetupDescription, eventType) {
-  let content = meetupDescription
-    .replace(/<[^>]*>/g, "")
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/\s+/g, " ")
-    .trim();
+function generateContentFromTitle(eventType, title, { locationDesc, startTime, endTime }) {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+  const fmt = (d) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
-  if (content.length > 500) {
-    content = content.substring(0, 497) + "...";
-  }
+  const baseIntro = {
+    運動: `本活動主題為「${title}」。一起流汗、放鬆身心，歡迎各種程度的同學參加！`,
+    出遊: `本次「${title}」將一起外出走走、探索新景點，拍照打卡，放鬆充電！`,
+    共煮: `「${title}」活動中大家會分工合作，一起備料、烹調，最後共享美味！`,
+    宵夜: `一起吃宵夜聊聊天，認識新朋友，享受美食與輕鬆時光！`,
+    讀書: `「${title}」為共學活動，將以重點整理、互助討論的方式提升學習效率。`,
+    練舞: `主要進行分段練習與排舞，不論新手或老手皆可加入！`,
+    其他: `「${title}」休閒交流活動，輕鬆參與、自在互動，歡迎有興趣的同學加入！`,
+  }[eventType] || `「${title}」聚會，歡迎一起參加！`;
 
-  if (content.length < 10) {
-    const placeholders = {
-      運動: "一起來運動，流流汗，認識新朋友！歡迎各種程度的同學參加。",
-      出遊: "一起出去走走，探索新地方，拍拍照，放鬆一下！",
-      共煮: "大家一起下廚，分享料理心得，享受美食！材料費AA制。",
-      宵夜: "深夜肚子餓？一起來吃宵夜聊聊天吧！",
-      讀書: "一起讀書，互相討論，準備考試！歡迎一起來衝刺。",
-      練舞: "一起練舞，不管是新手還是老手都歡迎！",
-      其他: "有興趣的同學歡迎報名參加，一起來玩！",
-    };
-    content = placeholders[eventType] || placeholders["其他"];
-  }
+  const placeText = locationDesc ? `集合地點：${locationDesc}。` : `地點：報名後公告或以場地資訊為準。`;
+  const timeText = `時間：${fmt(start)} 至 ${fmt(end)}。`;
+  const prepText = {
+    共煮: '食材與器具由大家分工準備，材料費AA制；若不方便準備也可一起協助分工。',
+    讀書: '現場提供重點講義與題目練習，歡迎攜帶自己的筆記與題庫。',
+    運動: '請穿著輕便服裝與運動鞋，攜帶水壺及毛巾。',
+    練舞: '建議穿著便於活動的服裝與鞋子，活動中會進行暖身。',
+    宵夜: '餐點以現場討論為主，若有素食需求請提前告知。',
+    出遊: '請自行攜帶水與簡易防曬用品，路線以當日狀況彈性調整。',
+    其他: '活動細節將於群組公告，歡迎提出建議與想法。',
+  }[eventType] || '細節以當日公告為準。';
 
-  return content;
+  const signupText = '報名後請準時出席，臨時無法參加請提前告知，以利人數與場地安排。';
+
+  const content = [baseIntro, placeText, timeText, prepText, signupText].join('\n');
+  return content.length > 1000 ? content.slice(0, 997) + '...' : content;
 }
 
 function adjustToRecentYear(date) {
@@ -307,24 +310,7 @@ async function generateEvents(meetupEvents, userCount, groupCount, venueCount) {
     usedTitles.add(uniqueTitle);
     title = uniqueTitle;
 
-    const content = generateContent(description, eventType);
     const { startTime, endTime, createdAt } = deriveTimesFromMeetup(meetupEvent);
-
-    const ownerId = faker.number.int({ min: 1, max: userCount });
-
-    // Group mapping: use group.who; if 'Members' => public
-    const who = (
-      meetupEvent["group.who"] ||
-      meetupEvent.group_who ||
-      ""
-    ).trim();
-    let groupId = null;
-    if (who && who.toLowerCase() !== "members") {
-      groupId = await ensureGroupIdByName(who);
-    }
-
-    // Capacity (2-30 people)
-    const capacity = faker.number.int({ min: 2, max: 30 });
 
     // Venue mapping: if venue.state == 'not_found' => no venue, keep text location; else assign venue_id and set location_desc NULL
     let locationDesc = faker.helpers.arrayElement(NTU_LOCATIONS);
@@ -349,6 +335,22 @@ async function generateEvents(meetupEvents, userCount, groupCount, venueCount) {
         locationDesc = null;
       }
     }
+
+    const content = generateContentFromTitle(eventType, title, { locationDesc, startTime, endTime });
+
+    const ownerId = faker.number.int({ min: 1, max: userCount });
+
+    // Group mapping: use group.who; if 'Members' => public
+    const who = (
+      meetupEvent["group.who"] ||
+      meetupEvent.group_who ||
+      ""
+    ).trim();
+    let groupId = null;
+    if (who && who.toLowerCase() !== "members") {
+      groupId = await ensureGroupIdByName(who);
+    }
+    const capacity = faker.number.int({ min: 2, max: 30 });
 
     // Status derived from time: past => Closed, upcoming/ongoing => Open with small chance Cancelled
     const now = new Date();
