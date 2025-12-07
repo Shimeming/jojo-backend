@@ -1,5 +1,5 @@
 import express from 'express';
-import { db } from './lib/db.js';
+import { db, connectMongo, mongoDb } from './lib/db.js';
 import { loadEnv } from './lib/env.js';
 
 loadEnv();
@@ -641,6 +641,20 @@ app.get('/test', async (_req, res) => {
   }
 });
 
+app.get('/test-mongo', async (req, res) => {
+  try {
+    const collection = mongoDb.collection('test_collection');
+    await collection.insertOne({ name: 'test_name' });
+    const result = await collection.findOne({ name: 'test_name' });
+    // cleanup
+    await collection.deleteOne({ name: 'test_name' });
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('mongo db error');
+  }
+});
+
 app.get('/tables/:name', async (req, res) => {
   const tableName = req.params.name;
   try {
@@ -655,3 +669,11 @@ app.get('/tables/:name', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
+async function main() {
+  await connectMongo();
+  app.listen(PORT, () => {
+    console.log(`Server listening on port ${PORT}`);
+  });
+}
+
+main();

@@ -142,3 +142,6 @@ vite.config.ts.timestamp-*
 
 #database
 db/data/
+db/mongo-data/
+src/seed/meetup_data/members.csv
+src/seed/meetup_data/members_topics.csv
