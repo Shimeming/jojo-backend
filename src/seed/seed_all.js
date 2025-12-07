@@ -1,4 +1,5 @@
 import { db } from '../lib/db.js';
+import { mongoDb } from '../lib/db.js';
 import { loadEnv } from '../lib/env.js';
 import fs from 'fs';
 import path from 'path';
@@ -57,6 +58,13 @@ function runNodeScript(relPath, extraArgs = []) {
 async function clearDatabase() {
   await runSQLFromFile('./drop_schema.sql');
   await runSQLFromFile('./create_tables.sql');
+  // Also clean MongoDB 'jojo' database (e.g., click_events)
+  try {
+    const result = await mongoDb.dropDatabase();
+    console.log('Dropped MongoDB database:', result?.dropped || 'jojo');
+  } catch (err) {
+    console.warn('Warning: failed to drop MongoDB database:', err?.message || err);
+  }
 }
 
 async function generateAll() {
@@ -69,6 +77,8 @@ async function generateAll() {
   const eventArgs = ['--count', String(COUNT_ARG ?? 10000)];
   await runNodeScript('./seed_events.js', eventArgs);
   await runNodeScript('./seed_join_records.js');
+  // Seed Mongo click events based on join records
+  await runNodeScript('./seed_clicks.js');
 }
 
 async function main() {
@@ -121,5 +131,9 @@ async function main() {
 main().then(() => db.$pool.end()).catch(async (err) => {
   console.error('Fatal error:', err);
   try { await db.$pool.end(); } catch {}
+  try { await mongoDb.client.close(); } catch {}
   process.exit(1);
+}).finally(async () => {
+  try { await db.$pool.end(); } catch {}
+  try { await mongoDb.client.close(); } catch {}
 });

@@ -3,6 +3,7 @@ import { db, connectMongo, mongoDb } from './lib/db.js';
 import { loadEnv } from './lib/env.js';
 import adminRoutes from './routes/adminRoutes.js';
 import authRoutes from './routes/authRoutes.js';
+import trackRoutes from './routes/trackRoutes.js';
 
 loadEnv();
 
@@ -19,6 +20,7 @@ app.use(express.json());
 // ==========================================
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/', trackRoutes);
 
 // ==========================================
 // 3. Event APIs

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JoJo Click Tracker</title>
+    <style>
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji"; margin: 2rem; }
+      .card { max-width: 640px; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+      button { background: #2563eb; color: white; border: none; border-radius: 8px; padding: 12px 16px; cursor: pointer; }
+      button:hover { background: #1d4ed8; }
+      .row { margin: 12px 0; }
+      input { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; width: 100%; }
+      .status { margin-top: 12px; color: #065f46; }
+      .error { color: #b91c1c; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>JoJo Click Tracker</h1>
+      <p>按下按鈕後，會將一筆點擊記錄寫入 MongoDB（資料庫：jojo）。</p>
+      <div class="row">
+        <label>使用者 ID</label>
+        <input id="userId" placeholder="例如：1" />
+      </div>
+      <div class="row">
+        <label>追蹤標籤 (trackingLabel)</label>
+        <input id="label" placeholder="例如：recommend" />
+      </div>
+      <button id="trackBtn">送出點擊事件</button>
+      <div id="status" class="status"></div>
+    </div>
+
+    <script>
+      const btn = document.getElementById('trackBtn');
+      btn.addEventListener('click', async () => {
+        const userId = document.getElementById('userId').value.trim();
+        const trackingLabel = document.getElementById('label').value.trim();
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = '';
+        statusEl.className = 'status';
+
+        if (!userId || !trackingLabel) {
+          statusEl.textContent = '請輸入使用者 ID 與追蹤標籤';
+          statusEl.className = 'status error';
+          return;
+        }
+
+        try {
+          const res = await fetch('/api/track', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, trackingLabel }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || '請求失敗');
+          statusEl.textContent = `成功：已寫入，id=${data.id}`;
+        } catch (err) {
+          statusEl.textContent = `錯誤：${err.message}`;
+          statusEl.className = 'status error';
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -20,6 +20,11 @@ The PostgreSQL server will be running on port 23013, and the backend will be run
 The password of the db server is `dbfinal`.
 and store its data in the `db/data/` folder.
 
+You can interact with mongo shell by running
+```
+mongosh "mongodb://root:dbfinal@localhost:27017/?authSource=admin"
+```
+
 Use
 ```
 pnpm run dev

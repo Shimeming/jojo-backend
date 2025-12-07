@@ -1,0 +1,6 @@
+Field Name,Type (BSON),Required?,Purpose / Description,Index?,Example
+_id,ObjectId,YES,Unique primary key.,Primary,"ObjectId(""656e1..."")"
+userId,String,YES,Reference to the user performing the action.,YES,"1"
+timestamp,Date,YES,Exact time the event occurred.,YES,"ISODate(""2025-12-07T..."")"
+eventType,String,YES,"The general type of event (e.g., 'click', 'page_view').",NO,"""click"""
+trackingLabel,String,YES,"Human-readable name for the specific action being tracked (e.g., ""Add_to_Cart"").",YES,"""Start_Checkout_Funnel"""
