@@ -2,6 +2,7 @@ import { db } from '../lib/db.js';
 import { loadEnv } from '../lib/env.js';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
 loadEnv();
@@ -13,7 +14,7 @@ const GENERATE_ONLY = args.includes('--generate-only');
 const FORCE = args.includes('--force');
 const COUNT_ARG = args.includes('--count') ? Number(args[args.indexOf('--count') + 1]) : undefined;
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname));
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 async function runSQLFromFile(fileName) {
   const sqlPath = path.resolve(ROOT, fileName);
@@ -59,19 +60,15 @@ async function clearDatabase() {
 }
 
 async function generateAll() {
-  // Seed event types first
-  await runNodeScript('./seed_event_types.js', ['--insert']);
-  // Seed core entities
+  await runNodeScript('./seed_event_types.js');
   await runNodeScript('./seed_users.js');
   await runNodeScript('./seed_groups.js');
-  await runNodeScript('./seed_venues.js', ['--insert']);
-  // Link users to groups
+  await runNodeScript('./seed_venues.js');
   await runNodeScript('./seed_user_groups.js');
-  // Seed user preferences
-  await runNodeScript('./seed_preferences.js', ['--insert']);
-  // Seed events; pass count if provided
+  await runNodeScript('./seed_preferences.js');
   const eventArgs = ['--count', String(COUNT_ARG ?? 10000)];
   await runNodeScript('./seed_events.js', eventArgs);
+  await runNodeScript('./seed_join_records.js');
 }
 
 async function main() {

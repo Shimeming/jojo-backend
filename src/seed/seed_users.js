@@ -3,6 +3,7 @@ import { loadEnv } from '../lib/env.js';
 import { faker } from '@faker-js/faker';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
 loadEnv();
 
@@ -45,8 +46,8 @@ function parseDepartmentsCSV(csvPath) {
   return data.filter((d) => !excludeCodes.has(d.DeptCode));
 }
 
-const CSV_PATH = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname), './department_people.csv'
+const CSV_PATH = path.join(
+  path.dirname(fileURLToPath(import.meta.url)), './department_people.csv'
 );
 const ntuDepartments = parseDepartmentsCSV(CSV_PATH);
 // console.log(`Parsed ${ntuDepartments.length} departments from CSV.`);

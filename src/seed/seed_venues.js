@@ -10,7 +10,6 @@ loadEnv();
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry');
-const INSERT = args.includes('--insert');
 
 const SPACES_MAP = [
   { Building: '第二學生活動中心', Floors: [3, 4], NamePrefixes: ['教室'] },
@@ -84,7 +83,7 @@ async function insertVenues(venues) {
 async function main() {
   const venues = enumerateVenues();
 
-  if (DRY_RUN && !INSERT) {
+  if (DRY_RUN) {
     console.log(`[dry] Generated ${venues.length} VENUE records (not inserting):`);
     console.table(
       venues.map(
@@ -94,17 +93,13 @@ async function main() {
     return;
   }
 
-  if (INSERT) {
-    try {
-      await insertVenues(venues);
-      console.log(`Inserted ${venues.length} VENUE records into jojo.venue`);
-    } catch (err) {
-      console.error('Failed to insert venues:', err);
-      process.exitCode = 1;
-    } finally {
-      pgp.end();
-    }
-  } else {
+  try {
+    await insertVenues(venues);
+    console.log(`Inserted ${venues.length} VENUE records into jojo.venue`);
+  } catch (err) {
+    console.error('Failed to insert venues:', err);
+    process.exitCode = 1;
+  } finally {
     pgp.end();
   }
 }
