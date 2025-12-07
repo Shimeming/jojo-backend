@@ -35,20 +35,6 @@ function makeUserGroups(userIds, groupPools) {
   const P_HAS_DORM = 0.35;
   const P_HAS_CLUB = 0.5;
 
-  function pickClubCount(maxClubsAvailable) {
-    const maxK = Math.max(1, Math.min(3, maxClubsAvailable));
-    // Unnormalized weights w_k = p^(k-1)
-    const weights = Array.from({ length: maxK }, (_, i) => Math.pow(CLUB_GEOM_P, i));
-    const sumW = weights.reduce((a, b) => a + b, 0);
-    const r = faker.number.float({ min: 0, max: 1 });
-    let acc = 0;
-    for (let k = 1; k <= maxK; k++) {
-      acc += weights[k - 1] / sumW;
-      if (r <= acc) return k;
-    }
-    return maxK;
-  }
-
   for (const uid of userIds) {
     // Ensure at least one department
     if (departments.length > 0) {
@@ -76,6 +62,8 @@ function makeUserGroups(userIds, groupPools) {
       for (let k = 1; k <= Math.min(3, clubs.length); k++) {
         if (faker.number.float({ min: 0, max: 1 }) < P_HAS_CLUB) {
           clubCount++;
+        } else {
+          break;
         }
       }
       const selectedClubs = faker.helpers.arrayElements(clubs, clubCount);
