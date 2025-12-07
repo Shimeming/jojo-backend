@@ -1,20 +1,71 @@
 import express from 'express';
+import crypto from 'crypto';
 import { db } from '../lib/db.js';
 
 const router = express.Router();
+
+function hashPassword(password) {
+    return crypto.createHash('sha256').update(password).digest('hex');
+}
 
 // ==========================================
 // 管理者 API Routes
 // ==========================================
 
-// --- 登入 ---
-router.post('/login', async (req, res) => {
-    const { username, password } = req.body;
+// --- 註冊 ---
+router.post('/register', async (req, res) => {
+    const { name, password } = req.body;
     
     try {
+        if (!name || !password) {
+            return res.status(400).json({ error: '帳號和密碼都是必填的' });
+        }
+        
+        if (name.length > 10) {
+            return res.status(400).json({ error: '帳號長度不能超過 10 個字元' });
+        }
+        
+        const hashedPassword = hashPassword(password);
+        
+        const maxId = await db.oneOrNone('SELECT MAX(user_id) as max_id FROM jojo.ADMIN_USER');
+        const nextId = (maxId?.max_id || 0) + 1;
+        
+        const result = await db.one(
+            `INSERT INTO jojo.ADMIN_USER (user_id, name, password_hash) 
+             VALUES ($1, $2, $3) 
+             RETURNING user_id, name`,
+            [nextId, name, hashedPassword]
+        );
+        
+        res.json({ 
+            success: true, 
+            message: '註冊成功',
+            admin: {
+                id: result.user_id,
+                name: result.name,
+                role: 'admin'
+            }
+        });
+    } catch (err) {
+        console.error('Admin Register Error:', err);
+        res.status(500).json({ error: '註冊失敗，請稍後再試' });
+    }
+});
+
+// --- 登入 ---
+router.post('/login', async (req, res) => {
+    const { name, password } = req.body;
+    
+    try {
+        if (!name || !password) {
+            return res.status(400).json({ error: '帳號和密碼都是必填的' });
+        }
+        
+        const hashedPassword = hashPassword(password);
+        
         const admin = await db.oneOrNone(
-            'SELECT * FROM jojo.ADMIN_USER WHERE name = $1 AND password_hash = $2',
-            [username, password]
+            'SELECT user_id, name FROM jojo.ADMIN_USER WHERE name = $1 AND password_hash = $2',
+            [name, hashedPassword]
         );
         
         if (!admin) {
@@ -22,9 +73,12 @@ router.post('/login', async (req, res) => {
         }
         
         res.json({ 
-            success: true, 
-            adminId: admin.user_id,
-            name: admin.name 
+            success: true,
+            admin: {
+                id: admin.user_id,
+                name: admin.name,
+                role: 'admin'
+            }
         });
     } catch (err) {
         console.error('Admin Login Error:', err);
@@ -289,7 +343,7 @@ router.get('/analytics/events-by-type', async (req, res) => {
                 COUNT(*) as event_count,
                 SUM(capacity) as total_capacity,
                 COUNT(DISTINCT owner_id) as unique_hosts,
-                ROUND(AVG(capacity), 2) as avg_capacity
+                ROUND(AVG(capacity)::numeric, 2) as avg_capacity
             FROM jojo.EVENT
             WHERE 1=1
         `;
@@ -368,7 +422,7 @@ router.get('/analytics/capacity-stats', async (req, res) => {
                 e.title as title,
                 e.capacity as capacity,
                 COUNT(jr.user_id) as current_participants,
-                ROUND((COUNT(jr.user_id)::float / NULLIF(e.capacity, 0)) * 100, 2) as fill_rate
+                ROUND((COUNT(jr.user_id)::numeric / NULLIF(e.capacity, 0)) * 100, 2) as fill_rate
             FROM jojo.EVENT e
             LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
             GROUP BY e.event_id, e.title, e.type_name, e.capacity
@@ -391,7 +445,7 @@ router.get('/analytics/top-hosts', async (req, res) => {
                 u.name as name,
                 COUNT(DISTINCT e.event_id) as events_hosted,
                 COUNT(DISTINCT jr.user_id) as total_participants,
-                ROUND(AVG(e.capacity), 2) as avg_capacity
+                ROUND(AVG(e.capacity)::numeric, 2) as avg_capacity
             FROM jojo.USER u
             JOIN jojo.EVENT e ON u.user_id = e.owner_id
             LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id

@@ -123,7 +123,26 @@ app.get('/api/users/:id/profile', async (req, res) => {
     }
 });
 
-// --- C. 取得場地列表 (建立活動用) ---
+// --- C. 取得用戶所屬群組 (建立活動用) ---
+app.get('/api/users/:id/groups', async (req, res) => {
+    const userId = req.params.id;
+    try {
+        const groups = await db.manyOrNone(`
+            SELECT g.group_id, g.name as group_name, g.category
+            FROM jojo.GROUP g
+            JOIN jojo.USER_GROUP ug ON g.group_id = ug.group_id
+            WHERE ug.user_id = $1
+            ORDER BY g.name
+        `, [userId]);
+        
+        res.json(groups);
+    } catch (err) {
+        console.error('Fetch user groups error:', err);
+        res.status(500).json({ error: 'Failed to fetch groups' });
+    }
+});
+
+// --- D. 取得場地列表 (建立活動用) ---
 app.get('/api/venues', async (req, res) => {
     try {
         const venues = await db.manyOrNone('SELECT * FROM jojo.VENUE');
