@@ -120,7 +120,7 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
   caption: [「揪揪」的 Relational Database Schema Diagram],
 ) <fig:schema>
 由 ER Diagram 可轉換成圖 2 的資料庫關聯模型，共有 十個主要資料表（Relation），分別為：
-`USER、ADMIN_USER、USER_GROUP、EVENT、JOIN_RECORD、VENUE、VENUE_BOOKING、GROUP、PREFERENCE、EVENT_TYPE`。
+`USER、ADMIN_USER、USER_GROUP、EVENT、JOIN_RECORD、VENUE、GROUP、PREFERENCE、EVENT_TYPE`。
 
 以下分別說明其主鍵（PK）、外鍵（FK）與關聯性。
 
@@ -142,8 +142,8 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
   - 外鍵（FK）：Owner_id → USER(User_id)
   - 外鍵（FK）：Group_id → GROUP(Group_id)（可為 NULL，若活動為公開）
   - 外鍵（FK）：Type_name → EVENT_TYPE(name)
-  - 屬性：Need_book, Title, Content, Capacity, Location_desc, Start_time, End_time, Status, Created_at
-  - 說明：儲存每場揪團活動的核心資訊，包含主辦人、活動時段、人數上限、限定群組等。若該活動需要預定場地，Need_book 會顯示 True。
+  - 屬性：Title, Content, Capacity, Location_desc, Start_time, End_time, Status, Created_at
+  - 說明：儲存每場揪團活動的核心資訊，包含主辦人、活動時段、人數上限、限定群組等。
 - `JOIN_RECORD`
   - 主鍵（PK）：Event_id, User_id
   - 外鍵（FK）：Event_id → EVENT(Event_id)
@@ -154,21 +154,14 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
   - 主鍵（PK）：Venue_id
   - 屬性：Name, Building, Location
   - 說明：儲存教室、球場或其他可借場地的資訊，供活動建立時查詢。
-- `VENUE_BOOKING`
-  - 主鍵（PK）：Event_id
-  - 外鍵（FK）：Venue_id → VENUE(Venue_id)
-  - 外鍵（FK）：Event_id → EVENT(Event_id)
-  - 屬性：Book_datetime
-  - 說明：儲存借用場地的相關資訊。
 - `GROUP`
   - 主鍵（PK）：Group_id
   - 屬性：Name, Category
   - 說明：代表系所、宿舍或社團。活動若設定為群組限定，僅該群組成員可加入。
 - `PREFERENCE`
-  - 主鍵（PK）：User_id, Priority
+  - 主鍵（PK）：User_id, Type_name
   - 外鍵（FK）：User_id → USER(User_id)
   - 外鍵（FK）：Type_name → EVENT_TYPE(name)
-  - 屬性：Priority
   - 說明：使用者的偏好設定表，用於推薦使用者可能想參加的活動
 - `EVENT_TYPE`
   - 主鍵（PK）：name
@@ -183,7 +176,7 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
 === 第一正規化(1NF)
 定義：確保資料表中所有欄位(屬性)都是不可分割的(atomic)，且每一筆資料都有一個唯一的主鍵(PK)。
 
-- 主鍵 : 所有的資料表(`USER`, `ADMIN_USER`, `GROUP`, `EVENT_TYPE`, `USER_GROUP`, `EVENT`, `JOIN_RECORD`, `VENUE`, `VENUE_BOOKING`, `PREFERENCE`) 都已定義了主鍵(PK)。
+- 主鍵 : 所有的資料表(`USER`, `ADMIN_USER`, `GROUP`, `EVENT_TYPE`, `USER_GROUP`, `EVENT`, `JOIN_RECORD`, `VENUE`, `PREFERENCE`) 都已定義了主鍵(PK)。
 - 原子性 : 根據Data Dictionary，所有欄位均為原子值。例如，沒有一個欄位會同時儲存多個號碼或群組。
 - 多值屬性 : 設計中正確地處理了多值屬性與多對多關係。例如:
   - `USER` 與 `GROUP` 之間的多對多關係，被分解為一個獨立的 `USER_GROUP` 關聯資料表。
@@ -206,9 +199,9 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
   - `Join_time`和`Status`都必須同時依於於哪個使用者(`User_id`)和哪個活動(`Event_id`)才能確定。它們不依賴於主鍵的任何一部分。
   - 結論 : 符合2NF 
 -  `PREFERENCE` :
-  - 主鍵(PK) : `User_id`, `Priority`
+  - 主鍵(PK) : `User_id`
   - 非主鍵屬性 : `TYPE_name`
-  - `Type_name`(偏好類別)必須同時依賴於哪個使用者(`User_id`)和其設定的優先序(`Priority`)才能確定。
+  - `Type_name`(偏好類別)必須同時依賴於哪個使用者(`User_id`)才能確定。
   - 結論 : 符合2NF 
 對於所有單一欄位主鍵的資料表 (如 USER, EVENT, VENUE 等)，它們自動符合 2NF。
 故此資料庫結構符合第二正規化 (2NF)。
@@ -236,7 +229,7 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
   `Group_id` 是主鍵 (超鍵)。`Name` 欄位有 `Unique` 約束，所以也是超鍵。
 - `EVENT_TYPE` 資料表：`name` 是主鍵 (超鍵)，亦有 `Unique` 約束。
 - `PREFERENCE` 資料表：
-  唯一的功能相依是 (`User_id`, `Priority`)$->$`Type_name`。其決定因子是主鍵，故也是超鍵。
+  唯一的功能相依是 (`User_id`)$->$`Type_name`。其決定因子是主鍵，故也是超鍵。
 - `JOIN_RECORD` 資料表：
   唯一的功能相依是 (`Event_id`, `User_id`)$->$(`Join_time`, `Status`)。其決定因子是主鍵，故也是超鍵。
 - 其他資料表：功能相依都由主鍵決定，因此決定因子都是超鍵。 
@@ -251,6 +244,5 @@ USER、EVENT、VENUE、GROUP、PREFERENCE_TYPE，以及七個關係（relationsh
 此結構已將所有多對多(M:N)關係分解為獨立的關聯資料表
 - `USER_GROUP`： 僅儲存 `USER` 和 `GROUP` 之間的 M:N 關係。它不包含任何其他獨立於此關係的屬性
 - `JOIN_RECORD`： 僅儲存 `USER` 和 `EVENT` 之間的 M:N 關係。`Join_time`和`Status`皆相依於`Event_id` 和 `User_id` ，而非獨立的多值事實。
-- `VENUE_BOOKING`： 僅儲存 `EVENT` 和 `VENUE` 之間的關係。
 - `PREFERENCE`： 僅儲存 `USER` 和 `EVENT_TYPE` 之間的M:N關係。
 設計中沒有任何資料表試圖同時儲存兩種不相關的多值事實。例如，`USER`資料表並未試圖同時儲存「使用者屬所有群組」和「使用者偏好的所有活動類型」。這些關係都有被正確地分離到`USER_GROUP`和`PREFERENCE`表中。故符合第四正規化(4NF)。
