@@ -39,6 +39,11 @@ Then go to `localhost:3010/test` to see if the backend server can connect to the
 To test the MongoDB functionality, go to `localhost:3010/test-mongo` to see if the backend server can connect to the MongoDB server successfully. This will insert a document into a test collection, retrieve it, and then delete it.
 
 ## Data
+Run
+```
+pnpm run seed --clear-and-generate
+```
+to clear the database and seed data into the database.
 ### User
 - number of people in departments:
   https://www.aca.ntu.edu.tw/WebUPD/aca/UAADStatistics/113%E4%B8%8B%E5%AD%B8%E6%9C%9F%E5%AD%B8%E7%94%9F%E4%BA%BA%E6%95%B8%E7%B5%B1%E8%A8%88%E8%A1%A8.pdf
