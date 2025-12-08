@@ -90,10 +90,13 @@ router.post('/login', async (req, res) => {
 router.get('/event-types', async (req, res) => {
     try {
         const types = await db.manyOrNone(`
-            SELECT type_name, COUNT(*) as event_count 
-            FROM jojo.EVENT 
-            GROUP BY type_name
-            ORDER BY event_count DESC
+            SELECT 
+                et.name as type_name, 
+                COUNT(e.event_id) as event_count 
+            FROM jojo.EVENT_TYPE et
+            LEFT JOIN jojo.EVENT e ON et.name = e.type_name
+            GROUP BY et.name
+            ORDER BY event_count DESC, et.name ASC
         `);
         res.json(types);
     } catch (err) {
