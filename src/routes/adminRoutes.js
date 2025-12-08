@@ -313,6 +313,7 @@ router.get('/analytics/overview', async (req, res) => {
         const eventCount = await db.one('SELECT COUNT(*) as count FROM jojo.EVENT');
         const groupCount = await db.one('SELECT COUNT(*) as count FROM jojo.GROUP');
         const participationCount = await db.one('SELECT COUNT(*) as count FROM jojo.JOIN_RECORD');
+        const totalCapacity = await db.one('SELECT COALESCE(SUM(capacity), 0) as total FROM jojo.EVENT');
         const thisMonthEvents = await db.one(`
             SELECT COUNT(*) as count FROM jojo.EVENT 
             WHERE DATE_TRUNC('month', start_time) = DATE_TRUNC('month', CURRENT_DATE)
@@ -322,11 +323,18 @@ router.get('/analytics/overview', async (req, res) => {
             WHERE DATE_TRUNC('month', join_time) = DATE_TRUNC('month', CURRENT_DATE)
         `);
         
+        // 計算平均參與率：(總參與次數 / 總容量) * 100
+        const avgParticipationRate = parseInt(totalCapacity.total) > 0 
+            ? (parseInt(participationCount.count) / parseInt(totalCapacity.total)) * 100
+            : 0;
+        
         res.json({
             totalUsers: parseInt(userCount.count),
             totalEvents: parseInt(eventCount.count),
             totalGroups: parseInt(groupCount.count),
             totalParticipations: parseInt(participationCount.count),
+            totalCapacity: parseInt(totalCapacity.total),
+            avgParticipationRate: parseFloat(avgParticipationRate.toFixed(1)),
             thisMonthEvents: parseInt(thisMonthEvents.count),
             thisMonthActiveUsers: parseInt(thisMonthActiveUsers.count)
         });
