@@ -4,6 +4,8 @@ import { faker } from '@faker-js/faker';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { saltRounds } from '../lib/auth.js';
+import bcrypt from 'bcrypt';
 
 loadEnv();
 
@@ -60,7 +62,7 @@ const COUNT = args.includes('--count') ? Number(args[args.indexOf('--count') + 1
 const DRY_RUN = args.includes('--dry');
 const CURRENT_SCHOOL_YEAR = 113; // 113學年度 (Data captured 114/03/25, which is 113-2 semester)
 
-function random_chinese_name() {
+function randomChineseName() {
   function random(a, l) {
     var x = [];
     x.push(a[Math.ceil(Math.random() * a.length)]);
@@ -147,8 +149,8 @@ function mapYearLevelToRegisterTime(yearLevel, schoolYear) {
   return admissionDate;
 }
 
-function buildUsers(n) {
-  const users = [];
+async function buildUsers(n) {
+  let users = [];
   const uniqEmails = new Set();
   const uniqPhones = new Set();
 
@@ -161,8 +163,6 @@ function buildUsers(n) {
       const maxFemale = dept[`${yearKey}F`] || 0;
 
       if (maxMale === 0 && maxFemale === 0) continue;
-
-      const baseCounterKey = `${dept.DeptCode}_${yearLevel}`;
 
       for (let i = 0; i < maxMale + maxFemale; i++) {
         const sex = (i < maxMale) ? 'Male' : 'Female';
@@ -180,19 +180,32 @@ function buildUsers(n) {
         const registerTime = mapYearLevelToRegisterTime(yearLevel, CURRENT_SCHOOL_YEAR);
 
         users.push({
-          name: random_chinese_name(),
+          name: randomChineseName(),
           email: email,
           sex: sex,
-          password_hash: randomPasswordHash(),
+          password_hash: '',
           phone: phoneVal,
           register_time: registerTime,
         });
       }
     }
   }
-  // Truncate the users array to match the total count from the data, which is the implicit COUNT.
-  // The loop logic ensures we don't over-generate, so this is just a final check.
-  return faker.helpers.shuffle(users).slice(0, n);
+
+  users = faker.helpers.shuffle(users);
+
+  for (let i = 0; i < users.length; i++) {
+    let password;
+    if (i < 10) {
+      password = 'password';
+      console.log(`User ${i + 1} (${users[i].email}) password: password`);
+      users[i].password_hash = await bcrypt.hash(password, saltRounds);
+    } else {
+      password = faker.internet.password();
+      users[i].password_hash = randomPasswordHash();
+    }
+  }
+
+  return users.slice(0, n);
 }
 
 async function insertUsers(users) {
@@ -212,7 +225,7 @@ async function insertUsers(users) {
 }
 
 async function main() {
-  const users = buildUsers(COUNT);
+  const users = await buildUsers(COUNT);
   if (DRY_RUN) {
     console.log(`[dry] Would insert ${users.length} users (total based on department counts):`);
     console.table(
@@ -240,3 +253,4 @@ async function main() {
 }
 
 main();
+

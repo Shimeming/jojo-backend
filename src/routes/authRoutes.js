@@ -1,13 +1,10 @@
 import express from 'express';
-import crypto from 'crypto';
+import bcrypt from 'bcrypt';
 import { db } from '../lib/db.js';
 
-const router = express.Router();
+import { saltRounds } from '../lib/auth.js';
 
-// Hash password using SHA-256
-function hashPassword(password) {
-    return crypto.createHash('sha256').update(password).digest('hex');
-}
+const router = express.Router();
 
 // 註冊新用戶
 router.post('/register', async (req, res) => {
@@ -20,8 +17,8 @@ router.post('/register', async (req, res) => {
         }
         
         // 驗證 email 格式 (必須是 ntu.edu.tw 結尾)
-        if (!email.endsWith('@ntu.edu.tw')) {
-            return res.status(400).json({ error: 'Email 必須是 ntu.edu.tw 結尾' });
+        if (!email.endsWith('@ntu.edu.tw') && !email.endsWith('@g.ntu.edu.tw')) {
+            return res.status(400).json({ error: 'Email 必須是 @ntu.edu.tw 或 @g.ntu.edu.tw 結尾' });
         }
         
         // 檢查 email 是否已被註冊
@@ -35,7 +32,7 @@ router.post('/register', async (req, res) => {
         }
         
         // Hash 密碼
-        const hashedPassword = hashPassword(password);
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
         
         // 新增用戶到資料庫
         const result = await db.one(
@@ -73,18 +70,21 @@ router.post('/login', async (req, res) => {
             return res.status(400).json({ error: 'Email 和密碼都是必填的' });
         }
         
-        // Hash 密碼
-        const hashedPassword = hashPassword(password);
-        
         // 查詢用戶
         const user = await db.oneOrNone(
-            `SELECT user_id, name, email, sex, phone, register_time 
+            `SELECT user_id, name, email, sex, phone, register_time, password_hash 
              FROM jojo.USER 
-             WHERE email = $1 AND password_hash = $2`,
-            [email, hashedPassword]
+             WHERE email = $1`,
+            [email]
         );
         
         if (!user) {
+            return res.status(401).json({ error: 'Email 或密碼錯誤' });
+        }
+
+        const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+        if (!passwordMatch) {
             return res.status(401).json({ error: 'Email 或密碼錯誤' });
         }
         
