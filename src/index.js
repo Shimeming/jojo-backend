@@ -100,23 +100,55 @@ app.get('/api/users/:id/profile', async (req, res) => {
             WHERE ug.user_id = $1
         `, [userId]);
         
-        // 3. 主辦過的活動
+        // 3. 主辦過的活動（加入時間、類別、群組資訊）
         const hosted = await db.manyOrNone(`
-            SELECT * FROM jojo.EVENT WHERE owner_id = $1
+            SELECT 
+                e.event_id, 
+                e.title, 
+                e.start_time, 
+                e.end_time, 
+                e.capacity, 
+                COUNT(jr.user_id) FILTER (WHERE jr.status = 'confirmed') as current_people,
+                e.type_name,
+                g.name as group_name
+            FROM jojo.EVENT e
+            LEFT JOIN jojo.GROUP g ON e.group_id = g.group_id
+            LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
+            WHERE e.owner_id = $1
+            GROUP BY e.event_id, e.title, e.start_time, e.end_time, e.capacity, e.type_name, g.name
+            ORDER BY e.start_time DESC
         `, [userId]);
 
-        // 4. 興趣 (用於推薦)
+        // 4. 參加過的活動（從 JOIN_RECORD 查詢）
+        const joined = await db.manyOrNone(`
+            SELECT 
+                e.event_id, 
+                e.title, 
+                e.start_time, 
+                e.end_time,
+                e.type_name,
+                g.name as group_name
+            FROM jojo.JOIN_RECORD jr
+            JOIN jojo.EVENT e ON jr.event_id = e.event_id
+            LEFT JOIN jojo.GROUP g ON e.group_id = g.group_id
+            WHERE jr.user_id = $1
+            ORDER BY e.start_time DESC
+        `, [userId]);
+
+        // 5. 興趣 (用於推薦)
         const interests = await db.manyOrNone(`
             SELECT type_name FROM jojo.PREFERENCE WHERE user_id = $1
         `, [userId]);
 
         res.json({
+            user_id: user.user_id,
             name: user.name,
             email: user.email,
+            sex: user.sex,
             avatar: '👤',
             groups: groups || [],
             hostedEvents: hosted || [],
-            joinedEvents: [], // 暫時留空或自行實作 JOIN_RECORD 查詢
+            joinedEvents: joined || [],
             interests: interests.map(i => i.type_name) || []
         });
     } catch (err) {
@@ -140,6 +172,67 @@ app.get('/api/users/:id/groups', async (req, res) => {
         res.json(groups);
     } catch (err) {
         console.error('Fetch user groups error:', err);
+        res.status(500).json({ error: 'Failed to fetch groups' });
+    }
+});
+
+// --- D. 加入群組 ---
+app.post('/api/users/:id/groups', async (req, res) => {
+    const userId = req.params.id;
+    const { groupId } = req.body;
+    
+    try {
+        await db.none(
+            `INSERT INTO jojo.USER_GROUP (user_id, group_id) 
+             VALUES ($1, $2) 
+             ON CONFLICT (user_id, group_id) DO NOTHING`,
+            [userId, groupId]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Join group error:', err);
+        res.status(500).json({ error: 'Failed to join group' });
+    }
+});
+
+// --- E. 離開群組 ---
+app.delete('/api/users/:id/groups/:groupId', async (req, res) => {
+    const { id: userId, groupId } = req.params;
+    
+    try {
+        const result = await db.result(
+            `DELETE FROM jojo.USER_GROUP WHERE user_id = $1 AND group_id = $2`,
+            [userId, groupId]
+        );
+        
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: 'User is not in this group' });
+        }
+        
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Leave group error:', err);
+        res.status(500).json({ error: 'Failed to leave group' });
+    }
+});
+
+// --- F. 取得所有群組列表 (供用戶瀏覽) ---
+app.get('/api/groups', async (req, res) => {
+    try {
+        const groups = await db.manyOrNone(`
+            SELECT 
+                g.group_id, 
+                g.name, 
+                g.category,
+                COUNT(DISTINCT ug.user_id) as member_count
+            FROM jojo.GROUP g
+            LEFT JOIN jojo.USER_GROUP ug ON g.group_id = ug.group_id
+            GROUP BY g.group_id, g.name, g.category
+            ORDER BY g.category, g.name
+        `);
+        res.json(groups);
+    } catch (err) {
+        console.error('Fetch groups error:', err);
         res.status(500).json({ error: 'Failed to fetch groups' });
     }
 });
@@ -176,25 +269,39 @@ app.post('/api/events', async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
         
-        const result = await db.one(
-            `INSERT INTO jojo.EVENT 
-                (owner_id, type_name, title, content, capacity, start_time, end_time, group_id, location_desc, venue_id) 
-             VALUES 
-                ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
-             RETURNING event_id`,
-             [
-                userId,                               // $1 owner_id (使用實際登入的 user_id)
-                typeId || '其他',                      // $2 type_name
-                title,                                // $3 title
-                content,                              // $4 content
-                capacity,                             // $5 capacity
-                startTime,                            // $6 start_time (TIMESTAMP)
-                endTime,                              // $7 end_time (TIMESTAMP)
-                finalGroupId,                         // $8 group_id
-                locationName || null,                 // $9 location_desc
-                venueId ? parseInt(venueId) : null    // $10 venue_id
-            ]
-        );
+        // 使用事務確保活動創建和創辦者加入同時成功
+        const result = await db.tx(async t => {
+            // 1. 創建活動
+            const event = await t.one(
+                `INSERT INTO jojo.EVENT 
+                    (owner_id, type_name, title, content, capacity, start_time, end_time, group_id, location_desc, venue_id) 
+                 VALUES 
+                    ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
+                 RETURNING event_id`,
+                 [
+                    userId,                               // $1 owner_id (使用實際登入的 user_id)
+                    typeId || '其他',                      // $2 type_name
+                    title,                                // $3 title
+                    content,                              // $4 content
+                    capacity,                             // $5 capacity
+                    startTime,                            // $6 start_time (TIMESTAMP)
+                    endTime,                              // $7 end_time (TIMESTAMP)
+                    finalGroupId,                         // $8 group_id
+                    locationName || null,                 // $9 location_desc
+                    venueId ? parseInt(venueId) : null    // $10 venue_id
+                ]
+            );
+            
+            // 2. 創辦者自動加入活動
+            await t.none(
+                `INSERT INTO jojo.JOIN_RECORD (event_id, user_id, status, join_time) 
+                 VALUES ($1, $2, 'confirmed', NOW())`,
+                [event.event_id, userId]
+            );
+            
+            return event;
+        });
+        
         res.json({ success: true, eventId: result.event_id });
     } catch (err) {
         console.error('Create event error:', err);
@@ -224,7 +331,7 @@ app.post('/api/events/:id/join', async (req, res) => {
 
 app.get('/api/venues', async (req, res) => {
     try {
-        const venues = await db.manyOrNone('SELECT * FROM jojo."VENUE"');
+        const venues = await db.manyOrNone('SELECT * FROM jojo.VENUE');
         res.json(venues);
     } catch (err) {
         console.error(err);
@@ -236,24 +343,27 @@ app.get('/api/venues', async (req, res) => {
 // 6. Preference APIs
 // ==========================================
 
-app.get('/api/preferences/list', (req, res) => {
-    const standardTags = [
-        "運動", "讀書", "電影", "宵夜", "戶外", "桌遊", "Coding", "攝影", "音樂", "美食"
-    ];
-    res.json(standardTags);
+app.get('/api/preferences/list', async (req, res) => {
+    try {
+        const types = await db.manyOrNone('SELECT name FROM jojo.EVENT_TYPE ORDER BY name');
+        const typeNames = types.map(t => t.name);
+        res.json(typeNames);
+    } catch (err) {
+        console.error('Fetch event types error:', err);
+        res.status(500).json({ error: 'Failed to fetch event types' });
+    }
 });
 
 app.post('/api/users/:id/preferences', async (req, res) => {
     const userId = req.params.id;
-    const { typeName } = req.body;
-    const defaultPriority = 1;
+    const { type_name } = req.body;
     
     try {
         await db.none(
-            `INSERT INTO jojo."PREFERENCE" (user_id, type_name, priority) 
-             VALUES ($1, $2, $3) 
+            `INSERT INTO jojo.PREFERENCE (user_id, type_name) 
+             VALUES ($1, $2) 
              ON CONFLICT (user_id, type_name) DO NOTHING`,
-            [userId, typeName, defaultPriority]
+            [userId, type_name]
         );
         res.json({ success: true });
     } catch (err) {
@@ -267,7 +377,7 @@ app.delete('/api/users/:userId/preferences/:typeName', async (req, res) => {
 
     try {
         const result = await db.result(
-            `DELETE FROM jojo."PREFERENCE" WHERE user_id = $1 AND type_name = $2`,
+            `DELETE FROM jojo.PREFERENCE WHERE user_id = $1 AND type_name = $2`,
             [userId, typeName]
         );
 
