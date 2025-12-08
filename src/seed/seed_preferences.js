@@ -10,7 +10,7 @@ const MIN_PER_USER = args.includes("--min") ? Number(args[args.indexOf("--min") 
 const MAX_PER_USER = args.includes("--max") ? Number(args[args.indexOf("--max") + 1]) : 3;
 
 async function getUsersAndTypes() {
-  const users = await db.manyOrNone('SELECT user_id FROM jojo."user" ORDER BY user_id');
+  const users = await db.manyOrNone('SELECT user_id FROM jojo.user ORDER BY user_id');
   const types = await db.manyOrNone("SELECT name FROM jojo.event_type ORDER BY name");
   return { users: users.map(u => u.user_id), types: types.map(t => t.name) };
 }

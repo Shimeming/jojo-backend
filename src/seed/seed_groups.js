@@ -7,7 +7,7 @@ import { fileURLToPath } from 'url';
 loadEnv();
 
 // Seed script for GROUP table
-// Schema: public."GROUP"(Group_id serial PK, Name text UNIQUE)
+// Schema: public.GROUP(Group_id serial PK, Name text UNIQUE)
 // Generates realistic NTU groups: departments, dorms, and clubs
 
 const args = process.argv.slice(2);

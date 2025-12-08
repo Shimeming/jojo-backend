@@ -189,37 +189,49 @@ function generateChineseTitle(eventType, originalTitle) {
   return title;
 }
 
-function generateContentFromTitle(eventType, title, { locationDesc, startTime, endTime }) {
+function generateContentFromTitle(
+  eventType,
+  title,
+  { locationDesc, startTime, endTime },
+) {
   const start = new Date(startTime);
   const end = new Date(endTime);
-  const fmt = (d) => `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const fmt = (d) =>
+    `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 
-  const baseIntro = {
-    運動: `本活動主題為「${title}」。一起流汗、放鬆身心，歡迎各種程度的同學參加！`,
-    出遊: `本次「${title}」將一起外出走走、探索新景點，拍照打卡，放鬆充電！`,
-    共煮: `「${title}」活動中大家會分工合作，一起備料、烹調，最後共享美味！`,
-    宵夜: `一起吃宵夜聊聊天，認識新朋友，享受美食與輕鬆時光！`,
-    讀書: `「${title}」為共學活動，將以重點整理、互助討論的方式提升學習效率。`,
-    練舞: `主要進行分段練習與排舞，不論新手或老手皆可加入！`,
-    其他: `「${title}」休閒交流活動，輕鬆參與、自在互動，歡迎有興趣的同學加入！`,
-  }[eventType] || `「${title}」聚會，歡迎一起參加！`;
+  const baseIntro =
+    {
+      運動: `本活動主題為「${title}」。一起流汗、放鬆身心，歡迎各種程度的同學參加！`,
+      出遊: `本次「${title}」將一起外出走走、探索新景點，拍照打卡，放鬆充電！`,
+      共煮: `「${title}」活動中大家會分工合作，一起備料、烹調，最後共享美味！`,
+      宵夜: `一起吃宵夜聊聊天，認識新朋友，享受美食與輕鬆時光！`,
+      讀書: `「${title}」為共學活動，將以重點整理、互助討論的方式提升學習效率。`,
+      練舞: `主要進行分段練習與排舞，不論新手或老手皆可加入！`,
+      其他: `「${title}」休閒交流活動，輕鬆參與、自在互動，歡迎有興趣的同學加入！`,
+    }[eventType] || `「${title}」聚會，歡迎一起參加！`;
 
-  const placeText = locationDesc ? `集合地點：${locationDesc}。` : `地點：報名後公告或以場地資訊為準。`;
+  const placeText = locationDesc
+    ? `集合地點：${locationDesc}。`
+    : `地點：報名後公告或以場地資訊為準。`;
   const timeText = `時間：${fmt(start)} 至 ${fmt(end)}。`;
-  const prepText = {
-    共煮: '食材與器具由大家分工準備，材料費AA制；若不方便準備也可一起協助分工。',
-    讀書: '現場提供重點講義與題目練習，歡迎攜帶自己的筆記與題庫。',
-    運動: '請穿著輕便服裝與運動鞋，攜帶水壺及毛巾。',
-    練舞: '建議穿著便於活動的服裝與鞋子，活動中會進行暖身。',
-    宵夜: '餐點以現場討論為主，若有素食需求請提前告知。',
-    出遊: '請自行攜帶水與簡易防曬用品，路線以當日狀況彈性調整。',
-    其他: '活動細節將於群組公告，歡迎提出建議與想法。',
-  }[eventType] || '細節以當日公告為準。';
+  const prepText =
+    {
+      共煮: "食材與器具由大家分工準備，材料費AA制；若不方便準備也可一起協助分工。",
+      讀書: "現場提供重點講義與題目練習，歡迎攜帶自己的筆記與題庫。",
+      運動: "請穿著輕便服裝與運動鞋，攜帶水壺及毛巾。",
+      練舞: "建議穿著便於活動的服裝與鞋子，活動中會進行暖身。",
+      宵夜: "餐點以現場討論為主，若有素食需求請提前告知。",
+      出遊: "請自行攜帶水與簡易防曬用品，路線以當日狀況彈性調整。",
+      其他: "活動細節將於群組公告，歡迎提出建議與想法。",
+    }[eventType] || "細節以當日公告為準。";
 
-  const signupText = '報名後請準時出席，臨時無法參加請提前告知，以利人數與場地安排。';
+  const signupText =
+    "報名後請準時出席，臨時無法參加請提前告知，以利人數與場地安排。";
 
-  const content = [baseIntro, placeText, timeText, prepText, signupText].join('\n');
-  return content.length > 1000 ? content.slice(0, 997) + '...' : content;
+  const content = [baseIntro, placeText, timeText, prepText, signupText].join(
+    "\n",
+  );
+  return content.length > 1000 ? content.slice(0, 997) + "..." : content;
 }
 
 function adjustToRecentYear(date) {
@@ -243,8 +255,12 @@ function deriveTimesFromMeetup(meetupEvent) {
   const eventTimeStr = meetupEvent.event_time;
   const durationStr = meetupEvent.duration;
 
-  const originalCreated = createdStr ? new Date(createdStr.replace(' ', 'T')) : new Date();
-  const originalEventTime = eventTimeStr ? new Date(eventTimeStr.replace(' ', 'T')) : new Date(originalCreated.getTime() + 24*3600*1000);
+  const originalCreated = createdStr
+    ? new Date(createdStr.replace(" ", "T"))
+    : new Date();
+  const originalEventTime = eventTimeStr
+    ? new Date(eventTimeStr.replace(" ", "T"))
+    : new Date(originalCreated.getTime() + 24 * 3600 * 1000);
 
   const offsetMs = originalEventTime.getTime() - originalCreated.getTime();
 
@@ -262,13 +278,16 @@ function deriveTimesFromMeetup(meetupEvent) {
   createdAt = new Date(createdAt.getTime() + createdShift);
   startTime = new Date(startTime.getTime() + startShift);
   while (startTime.getTime() <= createdAt.getTime()) {
-    startTime = new Date(startTime.getTime() + faker.number.int({ min: 0, max: maxShiftMs }));
+    startTime = new Date(
+      startTime.getTime() + faker.number.int({ min: 0, max: maxShiftMs }),
+    );
   }
 
   const durationSec = Number(durationStr);
   const fallbackHours = faker.number.int({ min: 1, max: 4 });
   const endTime = new Date(
-    startTime.getTime() + (durationSec > 0 ? durationSec * 1000 : fallbackHours * 3600 * 1000)
+    startTime.getTime() +
+      (durationSec > 0 ? durationSec * 1000 : fallbackHours * 3600 * 1000),
   );
 
   return { createdAt, startTime, endTime };
@@ -279,37 +298,19 @@ async function generateEvents(meetupEvents, userCount, groupCount, venueCount) {
   const events = [];
   const usedTitles = new Set();
 
-  // Preload existing groups and venues for stable mappings
   const groupNameToId = new Map();
-  const venueList = await db.manyOrNone(
-    "SELECT venue_id, name, building, location FROM jojo.venue",
-  );
-  const venueCountActual = venueList.length;
+  const venueNameToId = new Map();
+  
+  // console.log(`sample event: ${JSON.stringify(meetupEvents[0])}`);
 
-  // Load existing groups into map
-  const existingGroups = await db.manyOrNone(
-    'SELECT group_id, name FROM jojo."group"',
-  );
-  for (const g of existingGroups) groupNameToId.set(g.name, g.group_id);
-
-  async function ensureGroupIdByName(name) {
-    if (groupNameToId.has(name)) return groupNameToId.get(name);
-    // Default category: 'club'
-    const inserted = await db.one(
-      'INSERT INTO jojo."group" (name, category) VALUES ($1, $2) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING group_id',
-      [name, "club"],
-    );
-    groupNameToId.set(name, inserted.group_id);
-    return inserted.group_id;
-  }
-
-  // Sample with replacement to allow COUNT > dataset size
-  const max = meetupEvents.length;
   for (let i = 0; i < COUNT; i++) {
-    const idx = faker.number.int({ min: 0, max: Math.max(max - 1, 0) });
+    const idx = faker.number.int({
+      min: 0,
+      max: Math.max(meetupEvents.length - 1, 0),
+    });
     const meetupEvent = meetupEvents[idx];
-    const eventName = meetupEvent.event_name || meetupEvent.name || "";
-    const description = meetupEvent.description || "";
+    const eventName = meetupEvent.event_name;
+    const description = meetupEvent.description;
 
     if (!eventName) continue;
 
@@ -324,45 +325,49 @@ async function generateEvents(meetupEvents, userCount, groupCount, venueCount) {
     usedTitles.add(uniqueTitle);
     title = uniqueTitle;
 
-    const { startTime, endTime, createdAt } = deriveTimesFromMeetup(meetupEvent);
+    const { startTime, endTime, createdAt } =
+      deriveTimesFromMeetup(meetupEvent);
 
     // Venue mapping: if venue.state == 'not_found' => no venue, keep text location; else assign venue_id and set location_desc NULL
-    let locationDesc = faker.helpers.arrayElement(NTU_LOCATIONS);
+    const venueState = (meetupEvent["venue.state"] || "").toLowerCase();
+    const meetupVenueIdNum = Number(meetupEvent.venue_id);
+    let locationDesc = "";
     let venueId = null;
-    const venueState = (
-      meetupEvent["venue.state"] ||
-      meetupEvent.venue_state ||
-      ""
-    ).toLowerCase();
-    const meetupVenueIdStr = meetupEvent.venue_id || meetupEvent["venue_id"];
-    const meetupVenueIdNum = Number(meetupVenueIdStr);
     if (
       venueState &&
       venueState !== "not_found" &&
-      !Number.isNaN(meetupVenueIdNum) &&
-      venueCountActual > 0
+      !Number.isNaN(meetupVenueIdNum)
     ) {
-      const mappedIndex = Math.abs(meetupVenueIdNum) % venueCountActual;
-      const v = venueList[mappedIndex];
-      if (v) {
-        venueId = v.venue_id;
-        locationDesc = null;
+      if (venueNameToId.has(meetupVenueIdNum)) {
+        venueId = venueNameToId.get(meetupVenueIdNum);
+      } else {
+        venueId = faker.number.int({ min: 1, max: venueCount });
+        venueNameToId.set(meetupVenueIdNum, venueId);
       }
+      locationDesc = null;
+    } else {
+      locationDesc = faker.helpers.arrayElement(NTU_LOCATIONS);
+      venueId = null;
     }
 
-    const content = generateContentFromTitle(eventType, title, { locationDesc, startTime, endTime });
+    const content = generateContentFromTitle(eventType, title, {
+      locationDesc,
+      startTime,
+      endTime,
+    });
 
     const ownerId = faker.number.int({ min: 1, max: userCount });
 
     // Group mapping: use group.who; if 'Members' => public
-    const who = (
-      meetupEvent["group.who"] ||
-      meetupEvent.group_who ||
-      ""
-    ).trim();
+    const who = (meetupEvent["group.who"] || "").trim();
     let groupId = null;
     if (who && who.toLowerCase() !== "members") {
-      groupId = await ensureGroupIdByName(who);
+      // Only use existing group id if present; otherwise keep null
+      groupId = groupNameToId.get(who) || null;
+      if (!groupId) {
+        groupId = faker.number.int({ min: 1, max: groupCount });
+        groupNameToId.set(who, groupId);
+      }
     }
     const capacity = faker.number.int({ min: 2, max: 30 });
 
@@ -397,8 +402,8 @@ async function generateEvents(meetupEvents, userCount, groupCount, venueCount) {
 
 async function getTableCounts() {
   try {
-    const userResult = await db.one('SELECT COUNT(*) FROM jojo."user"');
-    const groupResult = await db.one('SELECT COUNT(*) FROM jojo."group"');
+    const userResult = await db.one("SELECT COUNT(*) FROM jojo.user");
+    const groupResult = await db.one("SELECT COUNT(*) FROM jojo.group");
     const venueResult = await db.one("SELECT COUNT(*) FROM jojo.venue");
     return {
       userCount: parseInt(userResult.count),

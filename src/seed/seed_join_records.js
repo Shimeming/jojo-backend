@@ -14,7 +14,7 @@ async function fetchEventsAndUsers() {
     FROM jojo.event
     ORDER BY event_id
   `);
-  const users = await db.manyOrNone('SELECT user_id FROM jojo."user" ORDER BY user_id');
+  const users = await db.manyOrNone('SELECT user_id FROM jojo.user ORDER BY user_id');
   return { events, users: users.map(u => u.user_id) };
 }
 
