@@ -71,6 +71,11 @@ To clear existing data and seed the database with initial data:
 pnpm run seed --clear-and-generate
 ```
 
+### Static backup
+It is recommended to run data seeding with the previous command rather than use provided static backup files.
+
+The static backup files are located in the `backup/` directory.
+
 ### Data Sources
 - **User Data**:
   - Number of people in departments: [NTU Academic Affairs Office](https://www.aca.ntu.edu.tw/WebUPD/aca/UAADStatistics/113%E4%B8%8B%E5%AD%B8%E6%9C%9F%E5%AD%B8%E7%94%9F%E4%BA%BA%E6%95%B8%E7%B5%B1%E8%A8%88%E8%A1%A8.pdf)
