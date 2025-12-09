@@ -433,7 +433,7 @@ app.patch('/api/events/:id/cancel', async (req, res) => {
 
 app.get('/api/venues', async (req, res) => {
     try {
-        const venues = await db.manyOrNone('SELECT * FROM jojo.VENUE');
+        const venues = await db.manyOrNone('SELECT venue_id AS id, name, building, location FROM jojo.VENUE ORDER BY name, location');
         res.json(venues);
     } catch (err) {
         console.error(err);
