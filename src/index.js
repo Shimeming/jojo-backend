@@ -28,47 +28,60 @@ app.use('/', trackRoutes);
 
 // 取得活動列表 (搜尋、篩選、推薦)
 app.get('/api/events', async (req, res) => {
-    // 取得前端傳來的篩選條件
     const { type, groupId, recommend, userId } = req.query;
 
     try {
-        // 基礎查詢：撈取活動 + 主辦人名字 + 群組名字
+
         let query = `
-            SELECT e.*, u.name as owner_name, g.name as group_name
+            SELECT 
+                e.event_id,
+                e.title,
+                e.content,
+                e.type_name,
+                e.start_time,
+                e.end_time,
+                e.capacity,
+                e.status,
+                COALESCE(e.location_desc, v.name) as location,
+                e.owner_id,
+                e.group_id,
+                u.name as owner_name,
+                g.name as group_name,
+                COUNT(jr.user_id) FILTER (WHERE jr.status = 'confirmed') as current_people
             FROM jojo.EVENT e
             JOIN jojo.USER u ON e.owner_id = u.user_id
             LEFT JOIN jojo.GROUP g ON e.group_id = g.group_id
-            WHERE 1=1 
-        `; 
+            LEFT JOIN jojo.VENUE v ON e.venue_id = v.venue_id
+            LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
+            WHERE e.status = 'Open'
+        `;
         
         const params = [];
         let paramIndex = 1;
 
-        // 1. 類型篩選
+        if (recommend === 'true' && userId) {
+            query += ` AND (
+                e.group_id IN (SELECT group_id FROM jojo.USER_GROUP WHERE user_id = $${paramIndex})
+                OR (e.type_name IN (SELECT type_name FROM jojo.PREFERENCE WHERE user_id = $${paramIndex}) 
+                    AND (e.group_id IS NULL OR e.group_id IN (SELECT group_id FROM jojo.USER_GROUP WHERE user_id = $${paramIndex})))
+            )`;
+            params.push(userId);
+            paramIndex++;
+        }
+
         if (type && type !== '全部') {
             query += ` AND e.type_name = $${paramIndex}`;
             params.push(type);
             paramIndex++;
         }
 
-        // 2. 群組/系所篩選
         if (groupId && groupId !== 'all') {
             query += ` AND e.group_id = $${paramIndex}`;
             params.push(groupId);
             paramIndex++;
         }
 
-        // 3. 一鍵推薦 (查詢 PREFERENCE 表)
-        if (recommend === 'true' && userId) {
-            query += ` AND e.type_name IN (
-                SELECT type_name FROM jojo.PREFERENCE WHERE user_id = $${paramIndex}
-            )`;
-            params.push(userId);
-            paramIndex++;
-        }
-
-        // 排序：依時間排序
-        query += ` ORDER BY e.start_time ASC`;
+        query += ` GROUP BY e.event_id, e.location_desc, u.name, g.name, v.name ORDER BY e.start_time ASC`;
 
         const events = await db.manyOrNone(query, params);
         res.json(events);
@@ -108,14 +121,17 @@ app.get('/api/users/:id/profile', async (req, res) => {
                 e.start_time, 
                 e.end_time, 
                 e.capacity, 
+                e.status,
+                COALESCE(e.location_desc, v.name) as location,
                 COUNT(jr.user_id) FILTER (WHERE jr.status = 'confirmed') as current_people,
                 e.type_name,
                 g.name as group_name
             FROM jojo.EVENT e
             LEFT JOIN jojo.GROUP g ON e.group_id = g.group_id
+            LEFT JOIN jojo.VENUE v ON e.venue_id = v.venue_id
             LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
             WHERE e.owner_id = $1
-            GROUP BY e.event_id, e.title, e.start_time, e.end_time, e.capacity, e.type_name, g.name
+            GROUP BY e.event_id, e.title, e.start_time, e.end_time, e.capacity, e.status, e.location_desc, v.name, e.type_name, g.name
             ORDER BY e.start_time DESC
         `, [userId]);
 
@@ -126,11 +142,14 @@ app.get('/api/users/:id/profile', async (req, res) => {
                 e.title, 
                 e.start_time, 
                 e.end_time,
+                e.status,
+                COALESCE(e.location_desc, v.name) as location,
                 e.type_name,
                 g.name as group_name
             FROM jojo.JOIN_RECORD jr
             JOIN jojo.EVENT e ON jr.event_id = e.event_id
             LEFT JOIN jojo.GROUP g ON e.group_id = g.group_id
+            LEFT JOIN jojo.VENUE v ON e.venue_id = v.venue_id
             WHERE jr.user_id = $1
             ORDER BY e.start_time DESC
         `, [userId]);
@@ -313,19 +332,100 @@ app.post('/api/events', async (req, res) => {
 app.post('/api/events/:id/join', async (req, res) => {
     const eventId = req.params.id;
     const { userId } = req.body;
+    
     try {
+        // 1. 檢查活動是否存在並取得資訊
+        const event = await db.oneOrNone(
+            'SELECT event_id, capacity, status, group_id FROM jojo.EVENT WHERE event_id = $1',
+            [eventId]
+        );
+        
+        if (!event) {
+            return res.status(404).json({ error: '活動不存在' });
+        }
+        
+        // 2. 檢查活動狀態
+        if (event.status !== 'Open') {
+            return res.status(400).json({ error: '活動已關閉，無法報名' });
+        }
+        
+        // 3. 檢查是否已報名
+        const existingJoin = await db.oneOrNone(
+            'SELECT * FROM jojo.JOIN_RECORD WHERE event_id = $1 AND user_id = $2',
+            [eventId, userId]
+        );
+        
+        if (existingJoin) {
+            return res.status(400).json({ error: '你已經報名過這個活動囉！' });
+        }
+        
+        // 4. 檢查活動容量
+        const currentCount = await db.one(
+            'SELECT COUNT(*) as count FROM jojo.JOIN_RECORD WHERE event_id = $1 AND status = \'confirmed\'',
+            [eventId]
+        );
+        
+        if (parseInt(currentCount.count) >= event.capacity) {
+            return res.status(400).json({ error: '活動已額滿，無法報名' });
+        }
+        
+        // 5. 檢查限定群組
+        if (event.group_id) {
+            const userInGroup = await db.oneOrNone(
+                'SELECT * FROM jojo.USER_GROUP WHERE user_id = $1 AND group_id = $2',
+                [userId, event.group_id]
+            );
+            
+            if (!userInGroup) {
+                return res.status(403).json({ error: '此活動限定群組成員，你不在該群組中' });
+            }
+        }
+        
+        // 6. 新增報名紀錄
         await db.none(
             `INSERT INTO jojo.JOIN_RECORD (event_id, user_id, status, join_time) 
              VALUES ($1, $2, 'confirmed', NOW())`,
             [eventId, userId]
         );
+        
         res.json({ success: true });
     } catch (err) {
-        if (err.code === '23505') { // 重複 Key 錯誤
-            return res.status(400).json({ error: '你已經報名過這個活動囉！' });
-        }
-        console.error(err);
+        console.error('Join event error:', err);
         res.status(500).json({ error: 'Join failed' });
+    }
+});
+
+app.patch('/api/events/:id/cancel', async (req, res) => {
+    const eventId = req.params.id;
+    
+    try {
+        // 檢查活動是否存在
+        const event = await db.oneOrNone('SELECT * FROM jojo.EVENT WHERE event_id = $1', [eventId]);
+        
+        if (!event) {
+            return res.status(404).json({ error: '活動不存在' });
+        }
+        
+        // 統計受影響的報名人數
+        const participantCount = await db.one(
+            'SELECT COUNT(*) as count FROM jojo.JOIN_RECORD WHERE event_id = $1 AND status = \'confirmed\'',
+            [eventId]
+        );
+        
+        // 更新活動狀態為 Cancelled
+        await db.none('UPDATE jojo.EVENT SET status = $1 WHERE event_id = $2', ['Cancelled', eventId]);
+        
+        // 注意：JOIN_RECORD 保留不刪除，以保存歷史記錄
+        // 如需通知用戶，可以查詢 JOIN_RECORD 獲取所有報名用戶的資訊
+        
+        res.json({ 
+            success: true, 
+            message: '活動已取消',
+            affectedParticipants: parseInt(participantCount.count)
+        });
+    } catch (err) {
+        console.error('Cancel event error:', err);
+        res.status(500).json({ error: 'Failed to cancel event' });
     }
 });
 

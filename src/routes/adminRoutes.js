@@ -274,14 +274,16 @@ router.get('/events', async (req, res) => {
         const events = await db.manyOrNone(`
             SELECT 
                 e.*,
+                COALESCE(e.location_desc, v.name) as location,
                 u.name as owner_name,
                 g.name as group_name,
                 COUNT(jr.user_id) as participant_count
             FROM jojo.EVENT e
             LEFT JOIN jojo.USER u ON e.owner_id = u.user_id
             LEFT JOIN jojo.GROUP g ON e.group_id = g.group_id
+            LEFT JOIN jojo.VENUE v ON e.venue_id = v.venue_id
             LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
-            GROUP BY e.event_id, u.name, g.name
+            GROUP BY e.event_id, e.location_desc, v.name, u.name, g.name
             ORDER BY e.start_time DESC
         `);
         res.json(events);
@@ -295,14 +297,19 @@ router.delete('/events/:id', async (req, res) => {
     const eventId = req.params.id;
     
     try {
-        await db.none('DELETE FROM jojo.JOIN_RECORD WHERE event_id = $1', [eventId]);
-        await db.none('DELETE FROM jojo.VENUE_BOOKING WHERE event_id = $1', [eventId]);
-        await db.none('DELETE FROM jojo.EVENT WHERE event_id = $1', [eventId]);
+        const result = await db.result(
+            `UPDATE jojo.EVENT SET status = 'Cancelled' WHERE event_id = $1`,
+            [eventId]
+        );
         
-        res.json({ success: true, message: '活動已刪除' });
+        if (result.rowCount === 0) {
+            return res.status(404).json({ error: '找不到此活動' });
+        }
+        
+        res.json({ success: true, message: '活動已取消' });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to delete event' });
+        res.status(500).json({ error: 'Failed to cancel event' });
     }
 });
 
@@ -312,6 +319,7 @@ router.get('/analytics/overview', async (req, res) => {
         const userCount = await db.one('SELECT COUNT(*) as count FROM jojo.USER');
         const eventCount = await db.one('SELECT COUNT(*) as count FROM jojo.EVENT');
         const groupCount = await db.one('SELECT COUNT(*) as count FROM jojo.GROUP');
+        const groupEventCount = await db.one('SELECT COUNT(*) as count FROM jojo.EVENT WHERE group_id IS NOT NULL');
         const participationCount = await db.one('SELECT COUNT(*) as count FROM jojo.JOIN_RECORD');
         const totalCapacity = await db.one('SELECT COALESCE(SUM(capacity), 0) as total FROM jojo.EVENT');
         const thisMonthEvents = await db.one(`
@@ -323,7 +331,6 @@ router.get('/analytics/overview', async (req, res) => {
             WHERE DATE_TRUNC('month', join_time) = DATE_TRUNC('month', CURRENT_DATE)
         `);
         
-        // 計算平均參與率：(總參與次數 / 總容量) * 100
         const avgParticipationRate = parseInt(totalCapacity.total) > 0 
             ? (parseInt(participationCount.count) / parseInt(totalCapacity.total)) * 100
             : 0;
@@ -332,6 +339,7 @@ router.get('/analytics/overview', async (req, res) => {
             totalUsers: parseInt(userCount.count),
             totalEvents: parseInt(eventCount.count),
             totalGroups: parseInt(groupCount.count),
+            groupEvents: parseInt(groupEventCount.count),
             totalParticipations: parseInt(participationCount.count),
             totalCapacity: parseInt(totalCapacity.total),
             avgParticipationRate: parseFloat(avgParticipationRate.toFixed(1)),
@@ -426,25 +434,28 @@ router.get('/analytics/user-activity', async (req, res) => {
 
 router.get('/analytics/capacity-stats', async (req, res) => {
     try {
+        const totalEvents = await db.one('SELECT COUNT(*) as count FROM jojo.EVENT');
+        const total = parseInt(totalEvents.count);
+        
         const data = await db.manyOrNone(`
             SELECT 
-                e.type_name as type,
-                e.event_id as event_id,
-                e.title as title,
-                e.capacity as capacity,
-                COUNT(jr.user_id) as current_participants,
-                ROUND((COUNT(jr.user_id)::numeric / NULLIF(e.capacity, 0)) * 100, 2) as fill_rate
-            FROM jojo.EVENT e
-            LEFT JOIN jojo.JOIN_RECORD jr ON e.event_id = jr.event_id
-            GROUP BY e.event_id, e.title, e.type_name, e.capacity
-            HAVING e.capacity > 0
-            ORDER BY fill_rate DESC
+                v.venue_id,
+                v.name as venue_name,
+                v.building,
+                v.location,
+                COUNT(e.event_id) as booking_count,
+                ROUND((COUNT(e.event_id)::numeric / NULLIF($1, 0)) * 100, 2) as usage_rate
+            FROM jojo.VENUE v
+            LEFT JOIN jojo.EVENT e ON v.venue_id = e.venue_id
+            GROUP BY v.venue_id, v.name, v.building, v.location
+            ORDER BY booking_count DESC
             LIMIT 20
-        `);
+        `, [total]);
+        
         res.json(data);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: 'Failed to fetch capacity stats' });
+        res.status(500).json({ error: 'Failed to fetch venue stats' });
     }
 });
 
