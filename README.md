@@ -31,18 +31,6 @@ pnpm run dev
 ```
 to start the backend server in development mode.
 
-To test functionality, you can use
-```sql
-CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY, name TEXT);
-INSERT INTO test_table (name) VALUES ('test_name');
-SELECT * FROM test_table;
-```
-to create a test table, insert a row, and query the row.
-
-Then go to `localhost:3010/test` to see if the backend server can connect to the PostgreSQL server successfully.
-
-To test the MongoDB functionality, go to `localhost:3010/test-mongo` to see if the backend server can connect to the MongoDB server successfully. This will insert a document into a test collection, retrieve it, and then delete it.
-
 ## Data
 Run
 ```

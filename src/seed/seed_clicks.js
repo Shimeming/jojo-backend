@@ -7,7 +7,7 @@ loadEnv();
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes("--dry");
-// trackingLabel is fixed to "recommend" per requirement
+// trackingLabel is fixed to "recommend_button_click" per requirement
 
 async function fetchEventsWithParticipants() {
   // Fetch events and their joiners
@@ -57,7 +57,7 @@ function buildClicksPerEvent(events, participantsByEvent) {
           userId: String(uid),
           timestamp: ts,
           eventType: 'click',
-          trackingLabel: 'recommend',
+          trackingLabel: 'recommend_button_click',
         });
       }
     }
