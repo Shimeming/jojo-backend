@@ -297,19 +297,21 @@ router.delete('/events/:id', async (req, res) => {
     const eventId = req.params.id;
     
     try {
-        const result = await db.result(
-            `UPDATE jojo.EVENT SET status = 'Cancelled' WHERE event_id = $1`,
-            [eventId]
-        );
+        await db.tx(async t => {
+            await t.none('DELETE FROM jojo.JOIN_RECORD WHERE event_id = $1', [eventId]);
+            const result = await t.result('DELETE FROM jojo.EVENT WHERE event_id = $1', [eventId]);
+            if (result.rowCount === 0) {
+                throw new Error('Event not found');
+            }
+        });
         
-        if (result.rowCount === 0) {
+        res.json({ success: true, message: '活動已刪除' });
+    } catch (err) {
+        console.error('Delete event error:', err);
+        if (err.message === 'Event not found') {
             return res.status(404).json({ error: '找不到此活動' });
         }
-        
-        res.json({ success: true, message: '活動已取消' });
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to cancel event' });
+        res.status(500).json({ error: 'Failed to delete event' });
     }
 });
 
