@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import { db } from '../lib/db.js';
+import { db, mongoDb } from '../lib/db.js';
 
 const router = express.Router();
 
@@ -479,6 +479,46 @@ router.get('/analytics/top-hosts', async (req, res) => {
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Failed to fetch top hosts' });
+    }
+});
+
+router.get('/analytics/click-events', async (req, res) => {
+    try {
+        const collection = mongoDb.collection('click_events');
+        
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        const data = await collection.aggregate([
+            {
+                $match: {
+                    timestamp: { $gte: thirtyDaysAgo }
+                }
+            },
+            {
+                $group: {
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$timestamp" } },
+                    count: { $sum: 1 }
+                }
+            },
+            {
+                $project: {
+                    date: '$_id',
+                    clicks: '$count',
+                    _id: 0
+                }
+            },
+            {
+                $sort: {
+                    date: 1
+                }
+            }
+        ]).toArray();
+        
+        res.json(data);
+    } catch (err) {
+        console.error('Fetch Click Events Error:', err);
+        res.status(500).json({ error: 'Failed to fetch click events' });
     }
 });
 
