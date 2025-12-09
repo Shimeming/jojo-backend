@@ -2,6 +2,9 @@
 
 This project serves as the backend for the DB Final Project,
 providing API endpoints and managing data with PostgreSQL and MongoDB.
+
+The front repository can be found [here](https://github.com/edwincmchiu/jojo-frontend).
+
 ## Table of Contents
 - [Installation](#installation)
 - [Running-the-App](#running-the-app)
